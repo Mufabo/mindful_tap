@@ -5,30 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mindful Tap Meditation Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; }
-        .side-tap-area {
-            transition: background-color 0.2s, box-shadow 0.2s;
-            cursor: pointer;
-            user-select: none;
-            touch-action: manipulation; /* Improves responsiveness on touch devices */
-        }
-        .side-tap-area.expected {
-            /* Highlight when the expected side is active */
-            box-shadow: 0 0 20px 5px rgba(59, 130, 246, 0.7); /* Blue glow */
-        }
-        .side-tap-area:active {
-            filter: brightness(0.9);
-        }
-        .beeping-bg {
-            animation: pulse-bg 1s infinite alternate;
-        }
-        @keyframes pulse-bg {
-            0% { background-color: #fca5a5; } /* Red-300 */
-            100% { background-color: #ef4444; } /* Red-500 */
-        }
-    </style>
+    <link rel="stylesheet" href="style.css">
 </head>
 <body class="bg-gray-50 min-h-screen flex flex-col items-center p-4">
 
@@ -53,9 +30,6 @@
         </div>
 
         <div class="flex space-x-4">
-            <button id="guidance-btn" class="px-4 py-3 bg-purple-500 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-purple-600 transition duration-200 transform hover:scale-105">
-                ✨ Get Guided Prompt
-            </button>
             <button id="settings-btn" class="px-4 py-3 bg-blue-500 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-blue-600 transition duration-200 transform hover:scale-105">
                 Settings
             </button>
@@ -106,7 +80,7 @@
                 <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
                     <label for="session-duration-input" class="text-gray-700 font-medium text-lg">Session Duration:</label>
                     <div class="flex items-center space-x-2">
-                         <input id="session-duration-input" type="number" value="10" min="1" max="180" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500" disabled>
+                         <input id="session-duration-input" type="number" value="10" min="1" max="180" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
                          <span class="text-gray-600 font-medium">minutes</span>
                     </div>
                     <p class="text-sm text-gray-500">The total time the meditation will run (1-180 min).</p>
@@ -116,7 +90,7 @@
                 <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
                     <label for="duration-input" class="text-gray-700 font-medium text-lg">Focus Window Duration:</label>
                     <div class="flex items-center space-x-2">
-                         <input id="duration-input" type="number" value="30" min="5" max="180" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500" disabled>
+                         <input id="duration-input" type="number" value="30" min="5" max="180" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
                          <span class="text-gray-600 font-medium">seconds</span>
                     </div>
                     <p class="text-sm text-gray-500">Time (in seconds) allowed between taps before focus reset.</p>
@@ -125,7 +99,7 @@
                 <!-- DTN Setting -->
                 <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
                     <label for="dtn-input" class="text-gray-700 font-medium text-lg">Double Tap Number (DTN):</label>
-                    <input id="dtn-input" type="number" value="5" min="2" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500" disabled>
+                    <input id="dtn-input" type="number" value="5" min="2" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
                     <p class="text-sm text-gray-500">How many breaths before a simultaneous tap is required.</p>
                 </div>
 
@@ -203,44 +177,14 @@
         </div>
     </div>
 
-    <!-- Focus Analysis Modal (NEW) -->
-    <div id="analysis-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
-        <div class="bg-white w-full max-w-lg p-8 rounded-xl shadow-2xl relative">
-            <h2 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
-                <span class="text-purple-600 mr-2">✨</span> Session Focus Analysis
-            </h2>
-            <div id="analysis-content" class="text-gray-700 text-base space-y-3">
-                <!-- Analysis content generated here -->
-                <p>Analyzing session...</p>
-            </div>
-            <button id="close-analysis-btn" class="mt-6 w-full px-4 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">
-                Close
-            </button>
-        </div>
-    </div>
-
-
-    <!-- User ID Display for Collaboration -->
-    <footer class="mt-8 text-sm text-gray-500 w-full max-w-4xl text-center">
-        Your User ID (for data storage): <span id="user-id-display" class="font-mono text-gray-700">Loading...</span>
-    </footer>
-
     <script type="module">
-        // --- Gemini API Setup ---
-        const API_KEY = ""; // Canvas provides the key at runtime
-        const TEXT_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${API_KEY}`;
-        const TTS_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${API_KEY}`;
-
-        // --- Firebase Imports ---
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Game Constants and State ---
         const DTN_DEFAULT = 5;
         const DEFAULT_INACTIVITY_MS = 30000; // 30 seconds default
         const SESSION_DURATION_DEFAULT_MINUTES = 10;
         const DOUBLE_TAP_WINDOW_MS = 300;
+        const LOCAL_STORAGE_KEY = 'mindfulTapSettings'; // Key for localStorage
 
         const state = {
             dtn: DTN_DEFAULT,
@@ -273,105 +217,44 @@
         let jDown = false;
 
 
-        // --- Firebase/Auth Setup ---
-        let db, auth;
-        let userId = 'loading';
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+        // --- Local Storage Persistence ---
 
-        const DTN_DOC_PATH = (uid) => `artifacts/${appId}/users/${uid}/meditation_game/settings`;
-
-        async function initializeFirebase() {
-            if (!firebaseConfig) {
-                console.error("Firebase config is missing. Data persistence disabled.");
-                // Use a fake Firestore interface to prevent crashes
-                db = {
-                    getDTNDocRef: () => ({ id: 'mock' }),
-                    setDTN: async () => {},
-                    saveDTN: async () => {},
-                    getDoc: async () => ({ exists: () => false }),
-                    setDoc: async () => {},
-                    onSnapshot: () => (() => {}), // Return an empty unsubscribe function
-                };
-                return;
-            }
-
-            try {
-                const app = initializeApp(firebaseConfig);
-                db = getFirestore(app);
-                auth = getAuth(app);
-
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
-                }
-
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        userId = user.uid;
-                        document.getElementById('user-id-display').textContent = userId;
-                        setupFirestoreListener(userId);
-                    } else {
-                        // This case should ideally not happen if signed in anonymously/custom token
-                        console.log("User signed out or failed to sign in.");
-                        document.getElementById('user-id-display').textContent = 'Error/No Auth';
-                    }
-                });
-
-            } catch (error) {
-                console.error("Firebase initialization or sign-in failed:", error);
-                document.getElementById('user-id-display').textContent = 'Error';
-            }
-        }
-
-        // --- Firestore Data Persistence ---
-
-        function setupFirestoreListener(uid) {
-            const docRef = doc(db, DTN_DOC_PATH(uid));
-            onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
+        function loadSettings() {
+            const storedSettings = localStorage.getItem(LOCAL_STORAGE_KEY);
+            if (storedSettings) {
+                try {
+                    const data = JSON.parse(storedSettings);
                     state.dtn = data.dtn || DTN_DEFAULT;
                     state.inactivityDurationMs = data.inactivityDurationMs || DEFAULT_INACTIVITY_MS;
                     state.sessionDurationMinutes = data.sessionDurationMinutes || SESSION_DURATION_DEFAULT_MINUTES;
                     state.longestStreak = data.longestStreak || 0;
-                    state.hideStatus = data.hideStatus !== undefined ? data.hideStatus : false; // Load new setting
-
-                    // Update input values only when loading from Firestore
-                    document.getElementById('dtn-input').value = state.dtn;
-                    document.getElementById('duration-input').value = state.inactivityDurationMs / 1000;
-                    document.getElementById('session-duration-input').value = state.sessionDurationMinutes;
-                    document.getElementById('hide-status-input').checked = state.hideStatus;
-
-                    updateUI();
-                } else {
-                    // Initialize with default values if document does not exist
-                    saveSettings(DTN_DEFAULT, DEFAULT_INACTIVITY_MS, SESSION_DURATION_DEFAULT_MINUTES, 0, false);
+                    state.hideStatus = data.hideStatus !== undefined ? data.hideStatus : false;
+                } catch (e) {
+                    console.error("Error parsing settings from localStorage:", e);
+                    // Fallback to defaults
                 }
-            }, (error) => {
-                console.error("Error setting up Firestore listener:", error);
-            });
-        }
-
-        async function saveSettings(dtn, inactivityDurationMs, sessionDurationMinutes, longestStreak, hideStatus) {
-            if (userId === 'loading' || !db) return;
-            try {
-                const docRef = doc(db, DTN_DOC_PATH(userId));
-                await setDoc(docRef, {
-                    dtn: dtn,
-                    inactivityDurationMs: inactivityDurationMs,
-                    sessionDurationMinutes: sessionDurationMinutes,
-                    longestStreak: longestStreak,
-                    hideStatus: hideStatus, // Save new setting
-                }, { merge: true });
-            } catch (error) {
-                console.error("Error saving settings:", error);
             }
+
+            // Update input fields with loaded (or default) values
+            document.getElementById('dtn-input').value = state.dtn;
+            document.getElementById('duration-input').value = state.inactivityDurationMs / 1000;
+            document.getElementById('session-duration-input').value = state.sessionDurationMinutes;
+            document.getElementById('hide-status-input').checked = state.hideStatus;
         }
 
-        // --- Audio Context for Focus Reminder (Beep) ---
+        function saveSettings(dtn, inactivityDurationMs, sessionDurationMinutes, longestStreak, hideStatus) {
+            state.longestStreak = longestStreak; // Update state before saving
+            const settings = {
+                dtn: dtn,
+                inactivityDurationMs: inactivityDurationMs,
+                sessionDurationMinutes: sessionDurationMinutes,
+                longestStreak: longestStreak,
+                hideStatus: hideStatus,
+            };
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(settings));
+        }
+
+        // --- Audio Context for Focus Reminder (Beep) and Tones ---
         let audioContext;
         let oscillator;
         let gainNode;
@@ -455,6 +338,34 @@
             }
         }
 
+        function playGong() {
+            try {
+                audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+
+                const oscillator = audioContext.createOscillator();
+                const gainNode = audioContext.createGain();
+
+                oscillator.type = 'sine';
+
+                // Low frequency start for the bell/gong sound
+                oscillator.frequency.setValueAtTime(110, audioContext.currentTime);
+
+                // Volume envelope for a gentle strike and fade out
+                gainNode.gain.setValueAtTime(0, audioContext.currentTime);
+                gainNode.gain.linearRampToValueAtTime(0.8, audioContext.currentTime + 0.05); // Quick rise to strike
+                gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 3); // Slow, gentle fade over 3s
+
+                oscillator.connect(gainNode);
+                gainNode.connect(audioContext.destination);
+
+                oscillator.start(audioContext.currentTime);
+                oscillator.stop(audioContext.currentTime + 3); // Stop after 3 seconds
+
+            } catch (e) {
+                console.warn("Audio API not supported or failed to play gong tone:", e);
+            }
+        }
+
         // --- Utility Functions ---
 
         function formatTime(totalSeconds) {
@@ -463,70 +374,6 @@
             const paddedSeconds = String(seconds).padStart(2, '0');
             return `${minutes}:${paddedSeconds}`;
         }
-
-        // Function to convert Base64 string to ArrayBuffer
-        function base64ToArrayBuffer(base64) {
-            const binaryString = atob(base64);
-            const len = binaryString.length;
-            const bytes = new Uint8Array(len);
-            for (let i = 0; i < len; i++) {
-                bytes[i] = binaryString.charCodeAt(i);
-            }
-            return bytes.buffer;
-        }
-
-        // Function to convert PCM audio data (Int16Array) to WAV Blob
-        function pcmToWav(pcm16, sampleRate) {
-            const numChannels = 1;
-            const bitsPerSample = 16;
-            const byteRate = sampleRate * numChannels * (bitsPerSample / 8);
-            const blockAlign = numChannels * (bitsPerSample / 8);
-
-            const buffer = new ArrayBuffer(44 + pcm16.length * 2);
-            const view = new DataView(buffer);
-
-            // RIFF identifier
-            writeString(view, 0, 'RIFF');
-            // File length
-            view.setUint32(4, 36 + pcm16.length * 2, true);
-            // WAVE identifier
-            writeString(view, 8, 'WAVE');
-            // fmt sub-chunk identifier
-            writeString(view, 12, 'fmt ');
-            // fmt sub-chunk length
-            view.setUint32(16, 16, true);
-            // Audio format (1 for PCM)
-            view.setUint16(20, 1, true);
-            // Number of channels
-            view.setUint16(22, numChannels, true);
-            // Sample rate
-            view.setUint32(24, sampleRate, true);
-            // Byte rate
-            view.setUint32(28, byteRate, true);
-            // Block align
-            view.setUint16(32, blockAlign, true);
-            // Bits per sample
-            view.setUint16(34, bitsPerSample, true);
-            // data sub-chunk identifier
-            writeString(view, 36, 'data');
-            // data sub-chunk length
-            view.setUint32(40, pcm16.length * 2, true);
-
-            // Write PCM data
-            let offset = 44;
-            for (let i = 0; i < pcm16.length; i++, offset += 2) {
-                view.setInt16(offset, pcm16[i], true);
-            }
-
-            return new Blob([view], { type: 'audio/wav' });
-        }
-
-        function writeString(view, offset, string) {
-            for (let i = 0; i < string.length; i++) {
-                view.setUint8(offset + i, string.charCodeAt(i));
-            }
-        }
-
 
         // --- Game Logic Functions ---
 
@@ -538,7 +385,6 @@
             const longestStreakDisplay = document.getElementById('longest-streak-display');
             const startBtn = document.getElementById('start-btn');
             const stopBtn = document.getElementById('stop-btn');
-            const guidanceBtn = document.getElementById('guidance-btn');
             const modalDtnDisplay = document.getElementById('modal-dtn-display');
             const dtnInput = document.getElementById('dtn-input');
             const durationInput = document.getElementById('duration-input');
@@ -565,7 +411,6 @@
 
             startBtn.disabled = isGameActive;
             stopBtn.disabled = !isGameActive;
-            guidanceBtn.disabled = isGameActive; // Disable guidance once the game starts
 
             if (isGameActive) {
                 startBtn.textContent = 'Running...';
@@ -617,16 +462,7 @@
                 sessionTimeDisplay.textContent = 'Session Time: --:--';
             }
 
-            // 6. Modal Input Updates (ensure inputs reflect current state/saved values)
-            if (document.getElementById('settings-modal').classList.contains('hidden')) {
-                dtnInput.value = state.dtn;
-                dtnInput.disabled = true;
-                durationInput.value = state.inactivityDurationMs / 1000;
-                durationInput.disabled = true;
-                sessionDurationInput.value = state.sessionDurationMinutes;
-                sessionDurationInput.disabled = true;
-                hideStatusInput.checked = state.hideStatus;
-            }
+            // 6. Modal Input Updates (removed disabling logic)
             if (modalDtnDisplay) {
                 modalDtnDisplay.textContent = state.dtn;
             }
@@ -649,10 +485,14 @@
 
             const finalStreak = state.currentStreak;
 
+            // Play gong if session completed automatically
+            if (trigger === 'complete') {
+                playGong();
+            }
+
             // Save streak if it's a record
             if (finalStreak > state.longestStreak) {
-                state.longestStreak = finalStreak;
-                saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, state.longestStreak, state.hideStatus);
+                saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, finalStreak, state.hideStatus);
             }
 
             // Reset streak and breath tracking
@@ -665,11 +505,6 @@
             // Set final game state and update UI
             state.gameState = 'idle';
             updateUI(trigger === 'complete' ? 'complete' : null);
-
-            // If a session ended (manual or complete), generate and show analysis
-            if (trigger === 'manual' || trigger === 'complete') {
-                generateFocusAnalysis(finalStreak, state.sessionDurationMinutes, state.longestStreak, state.dtn);
-            }
         }
 
         /**
@@ -690,8 +525,7 @@
 
             // Save current streak if it's the longest
             if (state.currentStreak > state.longestStreak) {
-                state.longestStreak = state.currentStreak;
-                saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, state.longestStreak, state.hideStatus);
+                saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, state.currentStreak, state.hideStatus);
             }
 
             // Reset breath/streak counters
@@ -794,8 +628,7 @@
         function handleTap(actualSide, actualTapType) {
             // Prevent interaction if modals are open or game is idle/complete
             if (document.getElementById('instructions-modal').classList.contains('hidden') === false ||
-                document.getElementById('settings-modal').classList.contains('hidden') === false ||
-                document.getElementById('analysis-modal').classList.contains('hidden') === false) {
+                document.getElementById('settings-modal').classList.contains('hidden') === false) {
                 return;
             }
             if (state.gameState !== 'running' && state.gameState !== 'paused') return;
@@ -831,131 +664,6 @@
                 resetFocus(mistakeTrigger);
             }
         }
-
-        // --- Gemini API Functions ---
-
-        async function fetchWithRetry(url, payload, retries = 3) {
-            for (let i = 0; i < retries; i++) {
-                try {
-                    const response = await fetch(url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-
-                    if (response.ok) {
-                        return await response.json();
-                    }
-
-                    if (response.status === 429 && i < retries - 1) {
-                        const delay = Math.pow(2, i) * 1000;
-                        console.warn(`Rate limit hit. Retrying in ${delay / 1000}s...`);
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                        continue;
-                    }
-                    throw new Error(`API request failed with status: ${response.status}`);
-
-                } catch (error) {
-                    console.error("API fetch error:", error);
-                    if (i === retries - 1) throw error;
-                    const delay = Math.pow(2, i) * 1000;
-                    console.warn(`Request failed. Retrying in ${delay / 1000}s...`);
-                    await new Promise(resolve => setTimeout(resolve, delay));
-                }
-            }
-        }
-
-        async function generateAndPlayGuidance() {
-            const guidanceBtn = document.getElementById('guidance-btn');
-            const originalText = guidanceBtn.textContent;
-            const audioPlayer = document.getElementById('audio-player');
-
-            guidanceBtn.textContent = 'Generating...';
-            guidanceBtn.disabled = true;
-            audioPlayer.pause();
-            audioPlayer.removeAttribute('src');
-
-            const userPrompt = `Generate a very short, soothing, and encouraging guided meditation prompt (about 15-20 words). The theme should be focusing on the present moment and returning attention to the breath. Do not include a speaker name.`;
-
-            const payload = {
-                contents: [{
-                    parts: [{ text: userPrompt }]
-                }],
-                generationConfig: {
-                    responseModalities: ["AUDIO"],
-                    speechConfig: {
-                        voiceConfig: {
-                            prebuiltVoiceConfig: { voiceName: "Achird" } // Friendly voice
-                        }
-                    }
-                },
-                model: "gemini-2.5-flash-preview-tts"
-            };
-
-            try {
-                const result = await fetchWithRetry(TTS_API_URL, payload);
-                const part = result?.candidates?.[0]?.content?.parts?.[0];
-                const audioData = part?.inlineData?.data;
-                const mimeType = part?.inlineData?.mimeType;
-
-                if (audioData && mimeType && mimeType.startsWith("audio/")) {
-                    const match = mimeType.match(/rate=(\d+)/);
-                    const sampleRate = match ? parseInt(match[1], 10) : 16000; // Default if rate not found
-
-                    const pcmData = base64ToArrayBuffer(audioData);
-                    const pcm16 = new Int16Array(pcmData);
-                    const wavBlob = pcmToWav(pcm16, sampleRate);
-                    const audioUrl = URL.createObjectURL(wavBlob);
-
-                    audioPlayer.src = audioUrl;
-                    audioPlayer.play();
-
-                    guidanceBtn.textContent = 'Playing Guidance...';
-                    audioPlayer.onended = () => {
-                        guidanceBtn.textContent = originalText;
-                        guidanceBtn.disabled = false;
-                        URL.revokeObjectURL(audioUrl);
-                    };
-
-                } else {
-                    throw new Error("Invalid audio response structure from TTS API.");
-                }
-
-            } catch (e) {
-                console.error("Gemini TTS Error:", e);
-                guidanceBtn.textContent = 'TTS Failed';
-                setTimeout(() => { guidanceBtn.textContent = originalText; guidanceBtn.disabled = false; }, 3000);
-            }
-        }
-
-        async function generateFocusAnalysis(finalStreak, sessionDuration, longestStreak, dtn) {
-            const analysisModal = document.getElementById('analysis-modal');
-            const analysisContent = document.getElementById('analysis-content');
-
-            analysisContent.innerHTML = '<p class="text-center py-4">Analyzing your focus patterns...<span class="animate-pulse">.</span><span class="animate-pulse" style="animation-delay: 0.1s;">.</span><span class="animate-pulse" style="animation-delay: 0.2s;">.</span></p>';
-            analysisModal.classList.remove('hidden');
-
-            const userPrompt = `You are a mindful meditation coach. The user just completed a ${sessionDuration} minute focus session. Their best streak in this session was ${finalStreak} breaths. Their all-time longest streak is ${longestStreak} breaths, and they reset their sequence every ${dtn} breaths. Provide a concise (2-3 sentences), encouraging, and gentle analysis of their focus, acknowledging their effort and suggesting a single positive takeaway for their next session. Do not use markdown formatting (like **).`;
-
-            const payload = {
-                contents: [{ parts: [{ text: userPrompt }] }],
-                systemInstruction: {
-                    parts: [{ text: "Act as a compassionate and encouraging meditation coach. Keep the response short, positive, and insightful." }]
-                },
-            };
-
-            try {
-                const result = await fetchWithRetry(TEXT_API_URL, payload);
-                const text = result?.candidates?.[0]?.content?.parts?.[0]?.text || "We couldn't generate the analysis right now, but great effort today! Every breath counts.";
-
-                analysisContent.innerHTML = `<p>${text}</p>`;
-
-            } catch (e) {
-                console.error("Gemini Analysis Error:", e);
-                analysisContent.innerHTML = '<p class="text-red-600">Focus Analysis failed to load. Please try again later. But remember, every moment of awareness is a success!</p>';
-            }
-        }
-
 
         // --- Event Handlers ---
 
@@ -1058,8 +766,6 @@
 
         document.getElementById('stop-btn').addEventListener('click', () => stopMeditation('manual'));
 
-        document.getElementById('guidance-btn').addEventListener('click', generateAndPlayGuidance);
-
         document.getElementById('save-settings-btn').addEventListener('click', () => {
             const dtnInput = document.getElementById('dtn-input');
             const durationInput = document.getElementById('duration-input');
@@ -1099,10 +805,6 @@
 
                 saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, state.longestStreak, state.hideStatus);
 
-                dtnInput.disabled = true;
-                durationInput.disabled = true;
-                sessionDurationInput.disabled = true;
-
                 // Show confirmation message
                 const originalText = document.getElementById('save-settings-btn').textContent;
                 document.getElementById('save-settings-btn').textContent = 'Saved!';
@@ -1115,21 +817,11 @@
                 if (state.gameState === 'running' || state.gameState === 'paused') {
                     startTapTimer();
                 }
+                updateUI();
 
             } else {
                 console.error("Settings validation failed:", feedback);
             }
-        });
-
-        // Toggle input editability
-        document.getElementById('dtn-input').addEventListener('click', () => {
-             document.getElementById('dtn-input').disabled = false;
-        });
-        document.getElementById('duration-input').addEventListener('click', () => {
-             document.getElementById('duration-input').disabled = false;
-        });
-        document.getElementById('session-duration-input').addEventListener('click', () => {
-             document.getElementById('session-duration-input').disabled = false;
         });
 
         // 4. Modal Handlers
@@ -1148,9 +840,6 @@
             document.getElementById('session-duration-input').value = state.sessionDurationMinutes;
             document.getElementById('hide-status-input').checked = state.hideStatus;
 
-            document.getElementById('dtn-input').disabled = true;
-            document.getElementById('duration-input').disabled = true;
-            document.getElementById('session-duration-input').disabled = true;
             document.getElementById('settings-modal').classList.remove('hidden');
         }
 
@@ -1160,16 +849,10 @@
             updateUI();
         }
 
-        function closeAnalysis() {
-            document.getElementById('analysis-modal').classList.add('hidden');
-        }
-        document.getElementById('close-analysis-btn').addEventListener('click', closeAnalysis);
-
-
         // --- Initialization ---
 
-        window.onload = async function() {
-            await initializeFirebase();
+        window.onload = function() {
+            loadSettings(); // Load settings from localStorage
 
             // Add event listeners for tap areas
             document.getElementById('left-area').addEventListener('click', handleScreenTap);
