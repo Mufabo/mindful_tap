@@ -5,185 +5,56 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mindful Tap Meditation Game</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="style.css">
-</head>
-<body class="bg-gray-50 min-h-screen flex flex-col items-center p-4">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
 
-    <!-- Header -->
-    <header class="w-full max-w-4xl text-center mb-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Mindful Tap: Breath Focus Game</h1>
-        <p class="text-sm text-gray-600 mb-4">
-            A tool to anchor your mind to your breath. Observe your breath, then tap the required side.
-        </p>
-    </header>
+        /* Apply button styling to match the previous div structure, ensuring it fills the flex area */
+        .side-tap-area {
+            transition: background-color 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+            user-select: none;
+            touch-action: manipulation;
+            /* Make button fill its flex container */
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: none;
+            background-color: transparent; /* Reset default button background */
+            padding: 1rem;
+        }
 
-    <!-- Game Status and Controls -->
-    <div class="w-full max-w-4xl bg-white p-6 rounded-lg shadow-xl mb-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
-        <div id="status-display" class="text-lg font-semibold text-gray-700">Status: Idle</div>
+        .side-tap-area.expected {
+            /* Highlight when the expected side is active */
+            box-shadow: 0 0 20px 5px rgba(59, 130, 246, 0.7); /* Blue glow */
+        }
 
-        <!-- Central display for Streak and Timer -->
-        <div class="text-center space-y-1">
-            <div id="session-time-display" class="text-xl font-bold text-gray-800">Session Time: --:--</div>
-            <div id="time-remaining-display" class="text-sm text-gray-600">Breath Window: --s</div>
-            <div id="streak-display" class="text-2xl font-extrabold text-indigo-600">Streak: 0</div>
-            <div id="longest-streak-display" class="text-sm text-gray-500">Longest: 0</div>
-        </div>
+        .side-tap-area:active {
+            filter: brightness(0.9);
+            transform: scale(0.99);
+        }
 
-        <div class="flex space-x-4">
-            <button id="settings-btn" class="px-4 py-3 bg-blue-500 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-blue-600 transition duration-200 transform hover:scale-105">
-                Settings
-            </button>
-            <button id="instructions-btn" class="px-4 py-3 bg-gray-500 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-gray-600 transition duration-200 transform hover:scale-105">
-                ? Instructions
-            </button>
-            <button id="stop-btn" class="px-8 py-3 bg-red-600 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-red-700 transition duration-200 transform hover:scale-105" disabled>
-                Stop
-            </button>
-            <button id="start-btn" class="px-8 py-3 bg-green-600 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-green-700 transition duration-200 transform hover:scale-105">
-                Start
-            </button>
-        </div>
-    </div>
+        /* Ensure the base background color is set on the button */
+        #left-area-btn { background-color: #e5e7eb; } /* gray-200 */
+        #right-area-btn { background-color: #e5e7eb; } /* gray-200 */
 
-    <!-- Audio Player (Hidden) -->
-    <audio id="audio-player" class="hidden"></audio>
+        .beeping-bg {
+            animation: pulse-bg 1s infinite alternate;
+        }
+        @keyframes pulse-bg {
+            0% { background-color: #fca5a5; } /* Red-300 */
+            100% { background-color: #ef4444; } /* Red-500 */
+        }
+    </style>
 
-    <!-- Main Tap Area -->
-    <main id="game-area" class="w-full max-w-4xl flex flex-col md:flex-row h-96 rounded-xl overflow-hidden shadow-2xl transition duration-500">
-
-        <!-- Left Tap Area -->
-        <div id="left-area" class="side-tap-area flex-1 bg-gray-200 flex items-center justify-center p-4 h-1/2 md:h-full border-r md:border-b-0 border-gray-300" data-side="left">
-            <div class="text-center">
-                <p class="text-3xl font-bold text-gray-800">Left Tap</p>
-                <p class="text-xl text-gray-600 mt-1">(Key: F)</p>
-            </div>
-        </div>
-
-        <!-- Right Tap Area -->
-        <div id="right-area" class="side-tap-area flex-1 bg-gray-200 flex items-center justify-center p-4 h-1/2 md:h-full" data-side="right">
-            <div class="text-center">
-                <p class="text-3xl font-bold text-gray-800">Right Tap</p>
-                <p class="text-xl text-gray-600 mt-1">(Key: J)</p>
-            </div>
-        </div>
-
-    </main>
-
-    <!-- Settings Modal Screen -->
-    <div id="settings-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
-        <div class="bg-white w-full max-w-md p-8 rounded-xl shadow-2xl relative">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">Game Settings</h2>
-
-            <div class="space-y-6">
-
-                <!-- Session Duration Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
-                    <label for="session-duration-input" class="text-gray-700 font-medium text-lg">Session Duration:</label>
-                    <div class="flex items-center space-x-2">
-                         <input id="session-duration-input" type="number" value="10" min="1" max="180" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
-                         <span class="text-gray-600 font-medium">minutes</span>
-                    </div>
-                    <p class="text-sm text-gray-500">The total time the meditation will run (1-180 min).</p>
-                </div>
-
-                <!-- Focus Window Duration Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
-                    <label for="duration-input" class="text-gray-700 font-medium text-lg">Focus Window Duration:</label>
-                    <div class="flex items-center space-x-2">
-                         <input id="duration-input" type="number" value="30" min="5" max="180" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
-                         <span class="text-gray-600 font-medium">seconds</span>
-                    </div>
-                    <p class="text-sm text-gray-500">Time (in seconds) allowed between taps before focus reset.</p>
-                </div>
-
-                <!-- DTN Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
-                    <label for="dtn-input" class="text-gray-700 font-medium text-lg">Double Tap Number (DTN):</label>
-                    <input id="dtn-input" type="number" value="5" min="2" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
-                    <p class="text-sm text-gray-500">How many breaths before a simultaneous tap is required.</p>
-                </div>
-
-                <!-- Hide Status Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
-                    <label for="hide-status-input" class="text-gray-700 font-medium text-lg flex items-center justify-between">
-                        Hide Status Display
-                        <input id="hide-status-input" type="checkbox" class="h-6 w-6 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                    </label>
-                    <p class="text-sm text-gray-500">Hide the detailed "Status" line during meditation for a cleaner view.</p>
-                </div>
-
-            </div>
-
-            <button id="save-settings-btn" class="mt-6 w-full px-4 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">
-                Save All Settings
-            </button>
-
-
-            <button id="close-settings-btn" class="absolute top-4 right-4 p-2 text-gray-600 hover:text-gray-800 transition duration-150 rounded-full bg-gray-100 hover:bg-gray-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-    </div>
-
-    <!-- Instructions Modal Screen -->
-    <div id="instructions-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
-        <div class="bg-white w-full max-w-3xl p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Mindful Tap Instructions</h2>
-
-            <div class="text-gray-700 text-base space-y-4">
-                <p>Before starting, take a comfortable position. You may close your eyes if you wish.</p>
-
-                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <h3 class="font-semibold text-lg text-blue-700 mb-2">The Basic Rhythm:</h3>
-                    <p class="mb-2">Observe your complete breath cycle (in-breath and out-breath).</p>
-                    <ul class="list-disc list-inside space-y-1 ml-4">
-                        <li>After each completed breath, tap the screen or press a key.</li>
-                        <li>The required tap site alternates: <span class="font-bold text-gray-900">Right (J key)</span> then <span class="font-bold text-gray-900">Left (F key)</span>.</li>
-                        <li>The meditation starts with a tap on the <span class="font-bold text-blue-600">Right side</span>.</li>
-                    </ul>
-                </div>
-
-                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                    <h3 class="font-semibold text-lg text-yellow-700 mb-2">Simultaneous Tap Cycle (DTN):</h3>
-                    <p>On every DTN-th breath (currently set to <span id="modal-dtn-display" class="font-bold text-red-600">5</span>), you must perform a <span class="font-bold text-red-600">SIMULTANEOUS KEY PRESS (F + J)</span>.</p>
-                    <p class="text-sm italic mt-1">Example (DTN=5): B1 (Right, single), B2 (Left, single), B3 (Right, single), B4 (Left, single), B5 (<span class="font-bold text-red-600">F + J simultaneously</span>). Then, restart counting (B1) with the opposite side (Left).</p>
-                    <p class="text-sm mt-2 font-semibold text-gray-800">Note: Simultaneous tap is only supported using the keyboard (F and J keys).</p>
-                </div>
-
-                <div class="bg-red-50 p-4 rounded-lg border border-red-200">
-                    <h3 class="font-semibold text-lg text-red-700 mb-2">Focus Reset:</h3>
-                    <p class="space-y-1">
-                        Any <span class="font-bold">mistake</span> (wrong side, wrong tap type, or failure to press F+J) or failing to tap within the <span class="font-bold">Breath Window</span> will:
-                        <ul class="list-disc list-inside ml-4">
-                            <li>Reset your streak counter to 0.</li>
-                            <li>Play a beep (Mistake Sound for alternating taps, Focus Reminder for inactivity).</li>
-                            <li>Visually highlight the required side(s).</li>
-                        </ul>
-                    </p>
-                    <p class="text-sm mt-2">
-                        <span class="font-bold text-gray-800">Note:</span> The mistake sound is suppressed during the DTN simultaneous tap attempt to maintain focus on coordination. Noticing your focus has shifted and gently bringing it back to your breath is an essential part of the meditation. Tap the correct side (or press the correct key combination) to silence the beep and resume your practice.
-                    </p>
-                </div>
-
-            </div>
-
-            <button id="close-instructions-btn" class="absolute top-4 right-4 p-2 text-gray-600 hover:text-gray-800 transition duration-150 rounded-full bg-gray-100 hover:bg-gray-200">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-            </button>
-        </div>
-    </div>
-
-    <script type="module">
-
+    <!-- 1. STATE & PERSISTENCE -->
+    <script>
         // --- Game Constants and State ---
         const DTN_DEFAULT = 5;
         const DEFAULT_INACTIVITY_MS = 30000; // 30 seconds default
         const SESSION_DURATION_DEFAULT_MINUTES = 10;
-        const DOUBLE_TAP_WINDOW_MS = 300;
         const LOCAL_STORAGE_KEY = 'mindfulTapSettings'; // Key for localStorage
 
         const state = {
@@ -191,19 +62,18 @@
             inactivityDurationMs: DEFAULT_INACTIVITY_MS,
             sessionDurationMinutes: SESSION_DURATION_DEFAULT_MINUTES,
             hideStatus: false,
+            isVibrationEnabled: false,
             gameState: 'idle', // 'idle', 'running', 'paused', 'complete'
             breathCount: 0, // 1 to DTN
             currentStreak: 0,
             longestStreak: 0,
-            expectedSide: 'right', // 'left', 'right', or 'both' (for simultaneous tap)
-            expectedTapType: 'single', // 'single', or 'simultaneous' (DTN-th tap)
+            expectedSide: 'right', // 'left' or 'right'
+            expectedTapType: 'single', // 'single' or 'double' (denoting a DTN sequence)
             cycleStartSide: 'right', // The side the current cycle started on (B1)
             tapTimer: null, // Timer for the focus window (inactivity reset)
             isBeeping: false,
-            // For screen double tap detection
-            lastTapTime: 0,
-            tapSide: null,
-            tapTimeout: null,
+            isAwaitingSecondTap: false, // Tracks if the first tap of the DTN double sequence has occurred.
+
             // Timers for display and session management
             timeRemaining: DEFAULT_INACTIVITY_MS / 1000, // Breath window seconds remaining
             countdownInterval: null, // Interval for the breath window countdown
@@ -212,13 +82,7 @@
             sessionCountdownInterval: null, // Interval for the session countdown
         };
 
-        // --- Keyboard State for Simultaneous Press ---
-        let fDown = false;
-        let jDown = false;
-
-
         // --- Local Storage Persistence ---
-
         function loadSettings() {
             const storedSettings = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (storedSettings) {
@@ -229,20 +93,24 @@
                     state.sessionDurationMinutes = data.sessionDurationMinutes || SESSION_DURATION_DEFAULT_MINUTES;
                     state.longestStreak = data.longestStreak || 0;
                     state.hideStatus = data.hideStatus !== undefined ? data.hideStatus : false;
+                    state.isVibrationEnabled = data.isVibrationEnabled !== undefined ? data.isVibrationEnabled : false;
                 } catch (e) {
                     console.error("Error parsing settings from localStorage:", e);
                     // Fallback to defaults
                 }
             }
 
-            // Update input fields with loaded (or default) values
-            document.getElementById('dtn-input').value = state.dtn;
-            document.getElementById('duration-input').value = state.inactivityDurationMs / 1000;
-            document.getElementById('session-duration-input').value = state.sessionDurationMinutes;
-            document.getElementById('hide-status-input').checked = state.hideStatus;
+            // Update input fields (relies on DOM being ready, handled in window.onload)
+            if (document.readyState === 'complete') {
+                document.getElementById('dtn-input').value = state.dtn;
+                document.getElementById('duration-input').value = state.inactivityDurationMs / 1000;
+                document.getElementById('session-duration-input').value = state.sessionDurationMinutes;
+                document.getElementById('hide-status-input').checked = state.hideStatus;
+                document.getElementById('vibration-input').checked = state.isVibrationEnabled;
+            }
         }
 
-        function saveSettings(dtn, inactivityDurationMs, sessionDurationMinutes, longestStreak, hideStatus) {
+        function saveSettings(dtn, inactivityDurationMs, sessionDurationMinutes, longestStreak, hideStatus, isVibrationEnabled) {
             state.longestStreak = longestStreak; // Update state before saving
             const settings = {
                 dtn: dtn,
@@ -250,18 +118,32 @@
                 sessionDurationMinutes: sessionDurationMinutes,
                 longestStreak: longestStreak,
                 hideStatus: hideStatus,
+                isVibrationEnabled: isVibrationEnabled,
             };
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(settings));
         }
+    </script>
 
+    <!-- 2. AUDIO UTILITIES -->
+    <script>
         // --- Audio Context for Focus Reminder (Beep) and Tones ---
         let audioContext;
         let oscillator;
         let gainNode;
 
+        // Vibration Function
+        function triggerVibration(pattern) {
+            if (state.isVibrationEnabled && 'vibrate' in navigator) {
+                navigator.vibrate(pattern);
+            }
+        }
+
         function startBeeping() {
             if (state.isBeeping) return;
             state.isBeeping = true;
+
+            // VIBRATION INTEGRATION (Long pattern for inactivity)
+            triggerVibration([500, 500, 500]);
 
             try {
                 audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
@@ -305,6 +187,9 @@
         function stopBeeping() {
             if (!state.isBeeping) return;
             state.isBeeping = false;
+            // Stop vibration immediately
+            triggerVibration(0);
+
             if (oscillator) {
                 try {
                     // Smoothly fade out the gain to avoid click sound
@@ -318,6 +203,9 @@
         }
 
         function playMistakeTone() {
+            // VIBRATION INTEGRATION (Short pulse for mistake)
+            triggerVibration(200);
+
             try {
                 audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
                 const tone = audioContext.createOscillator();
@@ -365,9 +253,11 @@
                 console.warn("Audio API not supported or failed to play gong tone:", e);
             }
         }
+    </script>
 
+    <!-- 3. GAME CORE LOGIC & UI UPDATES -->
+    <script>
         // --- Utility Functions ---
-
         function formatTime(totalSeconds) {
             const minutes = Math.floor(totalSeconds / 60);
             const seconds = totalSeconds % 60;
@@ -376,20 +266,16 @@
         }
 
         // --- Game Logic Functions ---
-
         function updateUI(statusOverride = null) {
-            const leftArea = document.getElementById('left-area');
-            const rightArea = document.getElementById('right-area');
+            const leftArea = document.getElementById('left-area-btn');
+            const rightArea = document.getElementById('right-area-btn');
             const statusDisplay = document.getElementById('status-display');
             const streakDisplay = document.getElementById('streak-display');
             const longestStreakDisplay = document.getElementById('longest-streak-display');
             const startBtn = document.getElementById('start-btn');
             const stopBtn = document.getElementById('stop-btn');
+            const pauseBtn = document.getElementById('pause-btn'); // NEW
             const modalDtnDisplay = document.getElementById('modal-dtn-display');
-            const dtnInput = document.getElementById('dtn-input');
-            const durationInput = document.getElementById('duration-input');
-            const sessionDurationInput = document.getElementById('session-duration-input');
-            const hideStatusInput = document.getElementById('hide-status-input');
             const timeRemainingDisplay = document.getElementById('time-remaining-display');
             const sessionTimeDisplay = document.getElementById('session-time-display');
 
@@ -400,48 +286,57 @@
             }
 
             const isGameActive = state.gameState === 'running' || state.gameState === 'paused';
+            const isRunning = state.gameState === 'running';
+            const isPaused = state.gameState === 'paused';
+            const isIdle = state.gameState === 'idle' || state.gameState === 'complete';
+
 
             // Apply visibility setting: Hide only when active AND setting is enabled
-            if (state.hideStatus && isGameActive) {
+            if (state.hideStatus && isRunning) {
                 statusDisplay.classList.add('hidden');
             } else {
                 statusDisplay.classList.remove('hidden');
                 statusDisplay.innerHTML = currentStatus; // Set the generic status if not hidden
             }
 
-            startBtn.disabled = isGameActive;
-            stopBtn.disabled = !isGameActive;
+            // Button visibility and text logic
+            stopBtn.disabled = isIdle; // Stop is available in Running or Paused
 
-            if (isGameActive) {
-                startBtn.textContent = 'Running...';
-            } else if (state.gameState === 'idle') {
+            if (isIdle) {
                 startBtn.textContent = 'Start';
+                startBtn.classList.remove('hidden');
+                pauseBtn.classList.add('hidden');
+            } else if (isRunning) {
+                startBtn.classList.add('hidden'); // Hide Start button
+                pauseBtn.textContent = 'Pause';
+                pauseBtn.classList.remove('hidden'); // Show Pause button
+            } else if (isPaused) {
+                startBtn.textContent = 'Resume';
+                startBtn.classList.remove('hidden'); // Show Resume button
+                pauseBtn.classList.add('hidden'); // Hide Pause button
             }
+
+            startBtn.disabled = isRunning; // Start button is disabled only if running (prevents double clicking)
 
             // 2. Tap Area Highlight
             leftArea.classList.remove('expected');
             rightArea.classList.remove('expected');
 
-            if (isGameActive) {
-                let tapText;
-                if (state.expectedTapType === 'simultaneous') {
-                     // Highlight both sides for simultaneous tap
-                     leftArea.classList.add('expected');
-                     rightArea.classList.add('expected');
-                     tapText = 'SIMULTANEOUS (F + J)';
+            if (isRunning) {
+                let tapText = (state.isAwaitingSecondTap ? 'Second Tap' : state.expectedTapType === 'double' ? 'First Tap (DTN)' : 'Single Tap');
 
-                     if (!state.hideStatus) {
-                         statusDisplay.innerHTML = `Breath ${state.breathCount}/${state.dtn} | <span class="text-red-600 font-bold">${tapText}</span>`;
-                     }
-                } else {
-                    // Highlight single expected side
-                    const expectedArea = document.getElementById(`${state.expectedSide}-area`);
-                    expectedArea.classList.add('expected');
-                    tapText = 'Single Tap';
+                // Highlight single expected side
+                const expectedArea = document.getElementById(`${state.expectedSide}-area-btn`);
+                expectedArea.classList.add('expected');
 
-                    if (!state.hideStatus) {
-                        statusDisplay.innerHTML = `Breath ${state.breathCount}/${state.dtn} | <span class="text-blue-600">${state.expectedSide.toUpperCase()} (${tapText})</span>`;
+                if (!state.hideStatus) {
+                    let breathStatus = `Breath ${state.breathCount}/${state.dtn}`;
+                    if (state.expectedTapType === 'double' && state.isAwaitingSecondTap) {
+                        // Display the full breath count for the full sequence
+                        breathStatus = `Breath ${state.dtn}/${state.dtn}`;
                     }
+
+                    statusDisplay.innerHTML = `${breathStatus} | <span class="text-blue-600">${state.expectedSide.toUpperCase()} (${tapText})</span>`;
                 }
             }
 
@@ -462,7 +357,7 @@
                 sessionTimeDisplay.textContent = 'Session Time: --:--';
             }
 
-            // 6. Modal Input Updates (removed disabling logic)
+            // 6. Modal Input Updates
             if (modalDtnDisplay) {
                 modalDtnDisplay.textContent = state.dtn;
             }
@@ -492,53 +387,90 @@
 
             // Save streak if it's a record
             if (finalStreak > state.longestStreak) {
-                saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, finalStreak, state.hideStatus);
+                saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, finalStreak, state.hideStatus, state.isVibrationEnabled);
             }
 
             // Reset streak and breath tracking
             state.currentStreak = 0;
             state.breathCount = 0; // Ensures restart goes to B1
             state.expectedSide = 'right';
-            state.expectedTapType = 'single';
+            state.expectedTapType = 'single'; // Reset tap type
             state.cycleStartSide = 'right';
+            state.isAwaitingSecondTap = false; // Reset DTN sequence flag
 
             // Set final game state and update UI
             state.gameState = 'idle';
             updateUI(trigger === 'complete' ? 'complete' : null);
         }
 
+        // NEW: Pause Meditation Function
+        function pauseMeditation() {
+            if (state.gameState !== 'running') return;
+
+            // 1. Stop all intervals/timeouts
+            clearTimeout(state.tapTimer);
+            clearInterval(state.countdownInterval);
+            clearInterval(state.sessionCountdownInterval);
+
+            // 2. Clear the main session timer
+            clearTimeout(state.sessionTimer);
+
+            state.tapTimer = null;
+            state.countdownInterval = null;
+            state.sessionTimer = null;
+
+            // 3. Update game state and UI
+            state.gameState = 'paused';
+            updateUI();
+        }
+
+        // NEW: Resume Meditation Function
+        function resumeMeditation() {
+            if (state.gameState !== 'paused') return;
+
+            state.gameState = 'running';
+
+            // 1. Restart breath window timer from scratch
+            startTapTimer();
+
+            // 2. Restart the session timer from the time we paused at
+            startSessionTimer(state.sessionTimeRemainingSeconds);
+
+            updateUI();
+        }
+
+
         /**
          * Resets the breath counter/streak due to mistake or inactivity, but keeps session running.
-         * @param {('mistake'|'tap_mistake'|'inactivity'|'start')} trigger - Type of reset.
-         * 'mistake': input error on alternating tap, plays tone.
-         * 'tap_mistake': input error on simultaneous tap, suppresses tone.
+         * 'mistake': input error, plays tone.
          * 'inactivity': timeout, starts beeping.
          * 'start': manual start, no sound.
          */
         function resetFocus(trigger) {
             console.log(`Resetting focus due to: ${trigger}`);
 
-            // Play mistake tone if reset was due to an input error on alternating tap
+            // Play mistake tone if reset was due to an input error
             if (trigger === 'mistake') {
                 playMistakeTone();
             }
 
             // Save current streak if it's the longest
             if (state.currentStreak > state.longestStreak) {
-                saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, state.currentStreak, state.hideStatus);
+                saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, state.currentStreak, state.hideStatus, state.isVibrationEnabled);
             }
 
             // Reset breath/streak counters
             state.currentStreak = 0;
-            state.breathCount = 1;
+            state.breathCount = 1; // Starts on breath 1
             state.cycleStartSide = 'right';
             state.expectedSide = 'right';
-            state.expectedTapType = (state.dtn === 1) ? 'simultaneous' : 'single'; // Handle DTN=1 case on reset
+            state.expectedTapType = 'single'; // B1 is always a single tap
+            state.isAwaitingSecondTap = false; // Reset DTN sequence flag
 
             if (trigger === 'inactivity') {
                 state.gameState = 'paused';
                 startBeeping();
-            } else { // Handles 'mistake', 'tap_mistake', and 'start'
+            } else { // Handles 'mistake' and 'start'
                 state.gameState = 'running';
                 startTapTimer();
             }
@@ -573,12 +505,14 @@
             updateUI();
         }
 
-        // Starts the main session duration timer
-        function startSessionTimer() {
+        // Starts the main session duration timer (accepts optional initialSeconds for resume)
+        function startSessionTimer(initialSeconds = null) {
             clearTimeout(state.sessionTimer);
             clearInterval(state.sessionCountdownInterval);
 
-            const durationMs = state.sessionDurationMinutes * 60 * 1000;
+            // Determine the starting time for the timer
+            const secondsToRun = initialSeconds !== null ? initialSeconds : state.sessionDurationMinutes * 60;
+            const durationMs = secondsToRun * 1000;
 
             // Set up the main timer that stops the session
             state.sessionTimer = setTimeout(() => {
@@ -586,7 +520,7 @@
             }, durationMs);
 
             // Set up the display countdown
-            state.sessionTimeRemainingSeconds = state.sessionDurationMinutes * 60;
+            state.sessionTimeRemainingSeconds = secondsToRun;
             state.sessionCountdownInterval = setInterval(() => {
                 state.sessionTimeRemainingSeconds = Math.max(0, state.sessionTimeRemainingSeconds - 1);
                 updateUI();
@@ -597,234 +531,108 @@
             }, 1000);
         }
 
+        /**
+         * Advances the breath count, streak, and expected side/tap type.
+         * Only called when a *breath* (either single tap or successful double-tap sequence) is complete.
+         */
         function advanceBreath() {
             state.currentStreak++;
 
-            if (state.breathCount === state.dtn) {
-                // Cycle complete! (Just processed the simultaneous tap). Prepare for the NEXT cycle (B1).
+            if (state.expectedTapType === 'double') {
+                // DTN double tap sequence just completed (after the second tap).
+                // Complete the cycle and flip the side.
                 state.breathCount = 1;
                 state.cycleStartSide = (state.cycleStartSide === 'right' ? 'left' : 'right');
                 state.expectedSide = state.cycleStartSide;
-                state.expectedTapType = (state.dtn === 1) ? 'simultaneous' : 'single';
+                state.expectedTapType = 'single';
             } else {
-                // Advance within the cycle. Prepare for the NEXT breath (B_n+1).
+                // Regular single tap just completed.
                 state.breathCount++;
                 state.expectedSide = (state.expectedSide === 'right' ? 'left' : 'right');
 
                 if (state.breathCount === state.dtn) {
-                     // The NEXT tap must be simultaneous (DTN-th breath)
-                     state.expectedSide = 'both';
-                     state.expectedTapType = 'simultaneous';
+                    state.expectedTapType = 'double';
                 } else {
-                     // The NEXT tap must be single
-                     state.expectedTapType = 'single';
+                    state.expectedTapType = 'single';
                 }
             }
 
             // Successfully processed, restart breath window timer
             startTapTimer();
         }
+    </script>
 
-        function handleTap(actualSide, actualTapType) {
-            // Prevent interaction if modals are open or game is idle/complete
+    <!-- 4. INPUT AND EVENT HANDLERS -->
+    <script>
+        /**
+         * Main input handling function. All inputs (screen click/key press) are considered single taps.
+         */
+        function handleTap(actualSide) {
+            // Prevent interaction if modals are open or game is idle/complete/paused
             if (document.getElementById('instructions-modal').classList.contains('hidden') === false ||
-                document.getElementById('settings-modal').classList.contains('hidden') === false) {
+                document.getElementById('settings-modal').classList.contains('hidden') === false ||
+                state.gameState === 'paused' || state.gameState === 'idle' || state.gameState === 'complete') {
                 return;
             }
             if (state.gameState !== 'running' && state.gameState !== 'paused') return;
 
-            // If in "paused" (beeping) state, only accept correct tap to resume
+            // If in "paused" (beeping) state, only accept correct side to resume
             if (state.isBeeping) {
-                if (actualSide === state.expectedSide && actualTapType === state.expectedTapType) {
-                    // Correct tap while beeping, resume game flow
+                if (actualSide === state.expectedSide) {
                     stopBeeping();
                     state.gameState = 'running';
-                    advanceBreath();
-                } else {
-                    // Wrong tap while beeping - still a mistake, but keeps beeping
-                    console.log("Mistake while Beeping - try again.");
+                    startTapTimer();
                 }
                 return;
             }
 
-            // Normal game flow
-            const success = (
-                actualSide === state.expectedSide &&
-                actualTapType === state.expectedTapType
-            );
+            const correctSide = (actualSide === state.expectedSide);
 
-            if (success) {
-                advanceBreath();
-            } else {
-                // MISTAKE detected.
-
-                // If the expected tap was simultaneous (DTN-th breath), reset but suppress the mistake tone ('tap_mistake').
-                // Otherwise, it's a regular alternating tap mistake ('mistake') and the tone should play.
-                const mistakeTrigger = state.expectedTapType === 'simultaneous' ? 'tap_mistake' : 'mistake';
-                resetFocus(mistakeTrigger);
-            }
-        }
-
-        // --- Event Handlers ---
-
-        // 1. Screen Tap Logic (Only works for single taps. Disabled during simultaneous breath.)
-        function handleScreenTap(event) {
-            if (state.expectedTapType === 'simultaneous') {
-                 // Ignore click/touch when expecting simultaneous keyboard input
-                 return;
-            }
-
-            const target = event.currentTarget;
-            const actualSide = target.dataset.side;
-            const currentTime = Date.now();
-
-            if (state.tapTimeout === null) {
-                // First tap: record time and side, set a timeout
-                state.lastTapTime = currentTime;
-                state.tapSide = actualSide;
-
-                state.tapTimeout = setTimeout(() => {
-                    // Timeout hit: assume this was a single tap
-                    state.tapTimeout = null;
-                    if (state.tapSide === actualSide) {
-                         handleTap(actualSide, 'single');
+            if (correctSide) {
+                if (state.expectedTapType === 'double') {
+                    if (state.isAwaitingSecondTap) {
+                        // SUCCESSFUL SECOND TAP (completes the DTN sequence)
+                        state.isAwaitingSecondTap = false;
+                        advanceBreath();
+                    } else {
+                        // SUCCESSFUL FIRST TAP (starts the DTN sequence)
+                        state.isAwaitingSecondTap = true;
+                        // Restart timer for the second tap. Streak is advanced only on completion.
+                        startTapTimer();
                     }
-                }, DOUBLE_TAP_WINDOW_MS);
-
-            } else if (actualSide === state.tapSide && (currentTime - state.lastTapTime) < DOUBLE_TAP_WINDOW_MS) {
-                // Second tap within window on the same side: detected double tap (MISTAKE now)
-                clearTimeout(state.tapTimeout);
-                state.tapTimeout = null;
-                // Double tap is now always a mistake during single tap sequence
-                handleTap(actualSide, 'double');
+                } else {
+                    // Success on regular single tap.
+                    advanceBreath();
+                }
             } else {
-                // Tap on a different side or outside the time window: treat as mistake and restart single tap detection
-                clearTimeout(state.tapTimeout);
-                state.tapTimeout = null;
-                // Treat this as the first tap of a potential new sequence
-                handleScreenTap(event);
+                // MISTAKE (wrong side)
+                resetFocus('mistake');
+                state.isAwaitingSecondTap = false; // Reset sequence if failed
             }
         }
 
-        // Set up key up handler to reset flags
-        document.addEventListener('keyup', (event) => {
-            const key = event.key.toLowerCase();
-            if (key === 'f') fDown = false;
-            if (key === 'j') jDown = false;
-        });
+        // 1. Screen Tap Logic (Simplest form: one click = one tap)
+        function handleScreenTap(event) {
+            const actualSide = event.currentTarget.dataset.side;
+            handleTap(actualSide);
+        }
 
-        // 2. Keyboard Logic (F for left, J for right, F+J for simultaneous)
+        // 2. Keyboard Logic (Simplest form: one keydown = one tap)
         function handleKeyDown(event) {
             const key = event.key.toLowerCase();
             let actualSide = null;
 
-            if (key === 'f') {
-                actualSide = 'left';
-                fDown = true;
-            } else if (key === 'j') {
-                actualSide = 'right';
-                jDown = true;
-            } else {
-                return;
-            }
+            if (key === 'f') { actualSide = 'left'; }
+            else if (key === 'j') { actualSide = 'right'; }
+            else { return; }
 
-            // Prevent holding the key down from triggering continuous taps
-            if (event.repeat) return;
-
+            if (event.repeat) return; // Prevent continuous tapping on key hold
             if (state.gameState !== 'running' && state.gameState !== 'paused') return;
 
-            // 1. Check for SIMULTANEOUS TAP (F+J)
-            if (state.expectedTapType === 'simultaneous' && fDown && jDown) {
-                handleTap('both', 'simultaneous');
-                // Reset flags after a successful simultaneous tap is detected and handled
-                fDown = false;
-                jDown = false;
-                return;
-            }
-
-            // 2. Normal single tap sequence check
-            if (state.expectedTapType === 'single') {
-                 // Single tap always expected here
-                 handleTap(actualSide, 'single');
-            } else {
-                 // MISTAKE: Single key pressed when simultaneous was expected
-                 if (state.expectedTapType === 'simultaneous' && (fDown || jDown)) {
-                      handleTap(actualSide, 'single'); // This will fail inside handleTap and trigger resetFocus('tap_mistake')
-                 }
-            }
+            handleTap(actualSide);
         }
 
-        // 3. Button and Input Handlers
-
-        document.getElementById('start-btn').addEventListener('click', () => {
-            if (state.gameState === 'idle' || state.gameState === 'complete') {
-                // Start a fresh meditation session
-                startSessionTimer(); // Start the overall session timer
-                resetFocus('start'); // Start the breath tracking
-            }
-        });
-
-        document.getElementById('stop-btn').addEventListener('click', () => stopMeditation('manual'));
-
-        document.getElementById('save-settings-btn').addEventListener('click', () => {
-            const dtnInput = document.getElementById('dtn-input');
-            const durationInput = document.getElementById('duration-input');
-            const sessionDurationInput = document.getElementById('session-duration-input');
-            const hideStatusInput = document.getElementById('hide-status-input');
-
-            const newDTN = parseInt(dtnInput.value, 10);
-            const newDurationSec = parseInt(durationInput.value, 10);
-            const newDurationMs = newDurationSec * 1000;
-            const newSessionDurationMin = parseInt(sessionDurationInput.value, 10);
-            const newHideStatus = hideStatusInput.checked;
-
-            let isValid = true;
-            let feedback = '';
-
-            if (newDTN < 2) {
-                feedback += "DTN must be 2 or greater. ";
-                dtnInput.value = state.dtn;
-                isValid = false;
-            }
-            if (newDurationSec < 5 || newDurationSec > 180) {
-                 feedback += "Breath Window Duration must be between 5 and 180 seconds. ";
-                 durationInput.value = state.inactivityDurationMs / 1000;
-                 isValid = false;
-            }
-            if (newSessionDurationMin < 1 || newSessionDurationMin > 180) {
-                 feedback += "Session Duration must be between 1 and 180 minutes. ";
-                 sessionDurationInput.value = state.sessionDurationMinutes;
-                 isValid = false;
-            }
-
-            if (isValid) {
-                state.dtn = newDTN;
-                state.inactivityDurationMs = newDurationMs;
-                state.sessionDurationMinutes = newSessionDurationMin; // Set new session duration
-                state.hideStatus = newHideStatus;
-
-                saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, state.longestStreak, state.hideStatus);
-
-                // Show confirmation message
-                const originalText = document.getElementById('save-settings-btn').textContent;
-                document.getElementById('save-settings-btn').textContent = 'Saved!';
-                setTimeout(() => {
-                    document.getElementById('save-settings-btn').textContent = originalText;
-                    closeSettings(); // Close modal after saving
-                }, 1000);
-
-                // If game is running, restart breath timer with new duration, but session timer continues unless reset.
-                if (state.gameState === 'running' || state.gameState === 'paused') {
-                    startTapTimer();
-                }
-                updateUI();
-
-            } else {
-                console.error("Settings validation failed:", feedback);
-            }
-        });
-
-        // 4. Modal Handlers
+        // 3. Modal Handlers
         function openInstructions() {
             document.getElementById('instructions-modal').classList.remove('hidden');
         }
@@ -839,6 +647,7 @@
             document.getElementById('duration-input').value = state.inactivityDurationMs / 1000;
             document.getElementById('session-duration-input').value = state.sessionDurationMinutes;
             document.getElementById('hide-status-input').checked = state.hideStatus;
+            document.getElementById('vibration-input').checked = state.isVibrationEnabled;
 
             document.getElementById('settings-modal').classList.remove('hidden');
         }
@@ -854,9 +663,9 @@
         window.onload = function() {
             loadSettings(); // Load settings from localStorage
 
-            // Add event listeners for tap areas
-            document.getElementById('left-area').addEventListener('click', handleScreenTap);
-            document.getElementById('right-area').addEventListener('click', handleScreenTap);
+            // Add event listeners for tap areas (now buttons)
+            document.getElementById('left-area-btn').addEventListener('click', handleScreenTap);
+            document.getElementById('right-area-btn').addEventListener('click', handleScreenTap);
 
             // Add event listeners for keyboard input
             document.addEventListener('keydown', handleKeyDown);
@@ -867,10 +676,275 @@
             document.getElementById('settings-btn').addEventListener('click', openSettings);
             document.getElementById('close-settings-btn').addEventListener('click', closeSettings);
 
+            // Add event listeners for control buttons
+            document.getElementById('start-btn').addEventListener('click', () => {
+                if (state.gameState === 'idle' || state.gameState === 'complete') {
+                    // Start a fresh meditation session
+                    startSessionTimer(); // Start the overall session timer (start fresh)
+                    resetFocus('start'); // Start the breath tracking
+                } else if (state.gameState === 'paused') {
+                    // Resume a paused session
+                    resumeMeditation();
+                }
+            });
+
+            document.getElementById('stop-btn').addEventListener('click', () => stopMeditation('manual'));
+            document.getElementById('pause-btn').addEventListener('click', pauseMeditation); // NEW
+
+            document.getElementById('save-settings-btn').addEventListener('click', () => {
+                const dtnInput = document.getElementById('dtn-input');
+                const durationInput = document.getElementById('duration-input');
+                const sessionDurationInput = document.getElementById('session-duration-input');
+                const hideStatusInput = document.getElementById('hide-status-input');
+                const vibrationInput = document.getElementById('vibration-input');
+
+                const newDTN = parseInt(dtnInput.value, 10);
+                const newDurationSec = parseInt(durationInput.value, 10);
+                const newDurationMs = newDurationSec * 1000;
+                const newSessionDurationMin = parseInt(sessionDurationInput.value, 10);
+                const newHideStatus = hideStatusInput.checked;
+                const newVibrationEnabled = vibrationInput.checked;
+
+                let isValid = true;
+                let feedback = '';
+
+                if (newDTN < 2) {
+                    feedback += "DTN must be 2 or greater. ";
+                    dtnInput.value = state.dtn;
+                    isValid = false;
+                }
+                if (newDurationSec < 5 || newDurationSec > 180) {
+                     feedback += "Breath Window Duration must be between 5 and 180 seconds. ";
+                     durationInput.value = state.inactivityDurationMs / 1000;
+                     isValid = false;
+                }
+                if (newSessionDurationMin < 1 || newSessionDurationMin > 180) {
+                     feedback += "Session Duration must be between 1 and 180 minutes. ";
+                     sessionDurationInput.value = state.sessionDurationMinutes;
+                     isValid = false;
+                }
+
+                if (isValid) {
+                    state.dtn = newDTN;
+                    state.inactivityDurationMs = newDurationMs;
+                    state.sessionDurationMinutes = newSessionDurationMin;
+                    state.hideStatus = newHideStatus;
+                    state.isVibrationEnabled = newVibrationEnabled;
+
+                    saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, state.longestStreak, state.hideStatus, state.isVibrationEnabled);
+
+                    // Show confirmation message
+                    const originalText = document.getElementById('save-settings-btn').textContent;
+                    document.getElementById('save-settings-btn').textContent = 'Saved!';
+                    setTimeout(() => {
+                        document.getElementById('save-settings-btn').textContent = originalText;
+                        closeSettings(); // Close modal after saving
+                    }, 1000);
+
+                    // If game is running, restart breath timer with new duration, but session timer continues unless reset.
+                    if (state.gameState === 'running' || state.gameState === 'paused') {
+                        startTapTimer();
+                    }
+                    updateUI();
+
+                } else {
+                    console.error("Settings validation failed:", feedback);
+                }
+            });
+
+
             // Initial UI setup
             updateUI();
         };
-
     </script>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col items-center p-4">
+
+    <!-- Header -->
+    <header class="w-full max-w-4xl text-center mb-8">
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Mindful Tap: Breath Focus Game</h1>
+        <p class="text-sm text-gray-600 mb-4">
+            A tool to anchor your mind to your breath. Observe your breath, then tap the required side.
+        </p>
+    </header>
+
+    <!-- Game Status and Controls -->
+    <div class="w-full max-w-4xl bg-white p-6 rounded-lg shadow-xl mb-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+        <div id="status-display" class="text-lg font-semibold text-gray-700">Status: Idle</div>
+
+        <!-- Central display for Streak and Timer -->
+        <div class="text-center space-y-1">
+            <div id="session-time-display" class="text-xl font-bold text-gray-800">Session Time: --:--</div>
+            <div id="time-remaining-display" class="text-sm text-gray-600">Breath Window: --s</div>
+            <div id="streak-display" class="text-2xl font-extrabold text-indigo-600">Streak: 0</div>
+            <div id="longest-streak-display" class="text-sm text-gray-500">Longest: 0</div>
+        </div>
+
+        <div class="flex space-x-4">
+            <button id="settings-btn" class="px-4 py-3 bg-blue-500 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-blue-600 transition duration-200 transform hover:scale-105">
+                Settings
+            </button>
+            <button id="instructions-btn" class="px-4 py-3 bg-gray-500 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-gray-600 transition duration-200 transform hover:scale-105">
+                ? Instructions
+            </button>
+
+            <!-- NEW Pause Button -->
+            <button id="pause-btn" class="px-8 py-3 bg-yellow-600 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-yellow-700 transition duration-200 transform hover:scale-105 hidden">
+                Pause
+            </button>
+
+            <!-- Stop Button -->
+            <button id="stop-btn" class="px-8 py-3 bg-red-600 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-red-700 transition duration-200 transform hover:scale-105" disabled>
+                Stop
+            </button>
+
+            <!-- Start/Resume Button -->
+            <button id="start-btn" class="px-8 py-3 bg-green-600 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-green-700 transition duration-200 transform hover:scale-105">
+                Start
+            </button>
+        </div>
+    </div>
+
+    <!-- Audio Player (Hidden) -->
+    <audio id="audio-player" class="hidden"></audio>
+
+    <!-- Main Tap Area -->
+    <main id="game-area" class="w-full max-w-4xl flex flex-col md:flex-row h-96 rounded-xl overflow-hidden shadow-2xl transition duration-500">
+
+        <!-- Left Tap Area Button -->
+        <button id="left-area-btn" class="side-tap-area flex-1 border-r md:border-b-0 border-gray-300" data-side="left">
+            <div class="text-center">
+                <p class="text-3xl font-bold text-gray-800">Left Tap</p>
+                <p class="text-xl text-gray-600 mt-1">(Key: F)</p>
+            </div>
+        </button>
+
+        <!-- Right Tap Area Button -->
+        <button id="right-area-btn" class="side-tap-area flex-1" data-side="right">
+            <div class="text-center">
+                <p class="text-3xl font-bold text-gray-800">Right Tap</p>
+                <p class="text-xl text-gray-600 mt-1">(Key: J)</p>
+            </div>
+        </button>
+
+    </main>
+
+    <!-- Settings Modal Screen -->
+    <div id="settings-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
+        <div class="bg-white w-full max-w-md p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">Game Settings</h2>
+
+            <div class="space-y-6">
+
+                <!-- Session Duration Setting -->
+                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
+                    <label for="session-duration-input" class="text-gray-700 font-medium text-lg">Session Duration:</label>
+                    <div class="flex items-center space-x-2">
+                         <input id="session-duration-input" type="number" value="10" min="1" max="180" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
+                         <span class="text-gray-600 font-medium">minutes</span>
+                    </div>
+                    <p class="text-sm text-gray-500">The total time the meditation will run (1-180 min).</p>
+                </div>
+
+                <!-- Focus Window Duration Setting -->
+                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
+                    <label for="duration-input" class="text-gray-700 font-medium text-lg">Focus Window Duration:</label>
+                    <div class="flex items-center space-x-2">
+                         <input id="duration-input" type="number" value="30" min="5" max="180" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
+                         <span class="text-gray-600 font-medium">seconds</span>
+                    </div>
+                    <p class="text-sm text-gray-500">Time (in seconds) allowed between taps before focus reset.</p>
+                </div>
+
+                <!-- DTN Setting (Now Cycle Length) -->
+                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
+                    <label for="dtn-input" class="text-gray-700 font-medium text-lg">Double Tap Number (DTN):</label>
+                    <input id="dtn-input" type="number" value="5" min="2" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
+                    <p class="text-sm text-gray-500">The cycle length. The DTN-th breath will require a double tap on the required side, after which the alternating pattern flips.</p>
+                </div>
+
+                <!-- Hide Status Setting -->
+                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
+                    <label for="hide-status-input" class="text-gray-700 font-medium text-lg flex items-center justify-between">
+                        Hide Status Display
+                        <input id="hide-status-input" type="checkbox" class="h-6 w-6 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    </label>
+                    <p class="text-sm text-gray-500">Hide the detailed "Status" line during meditation for a cleaner view.</p>
+                </div>
+
+                <!-- NEW: Vibration Setting -->
+                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
+                    <label for="vibration-input" class="text-gray-700 font-medium text-lg flex items-center justify-between">
+                        Enable Vibration Feedback
+                        <input id="vibration-input" type="checkbox" class="h-6 w-6 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                    </label>
+                    <p class="text-sm text-gray-500">Triggers device vibration for focus resets and mistakes (requires compatible device).</p>
+                </div>
+
+            </div>
+
+            <button id="save-settings-btn" class="mt-6 w-full px-4 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">
+                Save All Settings
+            </button>
+
+
+            <button id="close-settings-btn" class="absolute top-4 right-4 p-2 text-gray-600 hover:text-gray-800 transition duration-150 rounded-full bg-gray-100 hover:bg-gray-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Instructions Modal Screen -->
+    <div id="instructions-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
+        <div class="bg-white w-full max-w-3xl p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
+            <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Mindful Tap Instructions</h2>
+
+            <div class="text-gray-700 text-base space-y-4">
+                <p>Before starting, take a comfortable position. You may close your eyes if you wish.</p>
+
+                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
+                    <h3 class="font-semibold text-lg text-blue-700 mb-2">The Basic Rhythm:</h3>
+                    <p class="mb-2">Observe your complete breath cycle (in-breath and out-breath).</p>
+                    <ul class="list-disc list-inside space-y-1 ml-4">
+                        <li>After each completed breath, tap the screen or press a key.</li>
+                        <li>The required tap side alternates: <span class="font-bold text-gray-900">Right (J key)</span> then <span class="font-bold text-gray-900">Left (F key)</span>.</li>
+                        <li>The meditation starts with a tap on the <span class="font-bold text-blue-600">Right side</span>.</li>
+                    </ul>
+                </div>
+
+                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <h3 class="font-semibold text-lg text-yellow-700 mb-2">Double Tap Cycle (DTN):</h3>
+                    <p>On every DTN-th breath (currently set to <span id="modal-dtn-display" class="font-bold text-red-600">5</span>), you must perform a <span class="font-bold text-red-600">DOUBLE TAP</span> on the required side.</p>
+                    <p class="text-sm italic mt-1">Example (DTN=5): B1 (Right, single), B2 (Left, single), B3 (Right, single), B4 (Left, single), B5 (<span class="font-bold text-red-600">Right, double tap sequence</span>). This means two separate taps on the Right side are required for this breath. The side does not flip until the double tap sequence is complete. Then, restart counting (B1) with the opposite side (Left).</p>
+                    <p class="text-sm mt-2 font-semibold text-gray-800">Note: Double tap requires two quick, separate taps/key presses on the same side.</p>
+                </div>
+
+                <div class="bg-red-50 p-4 rounded-lg border border-red-200">
+                    <h3 class="font-semibold text-lg text-red-700 mb-2">Focus Reset:</h3>
+                    <p class="space-y-1">
+                        Any <span class="font-bold">mistake</span> (wrong side) or failing to tap within the <span class="font-bold">Breath Window</span> will:
+                        <ul class="list-disc list-inside ml-4">
+                            <li>Reset your streak counter to 0.</li>
+                            <li>Play a beep (Mistake Sound for incorrect tap, Focus Reminder for inactivity).</li>
+                            <li>Visually highlight the required side.</li>
+                        </ul>
+                    </p>
+                    <p class="text-sm mt-2">
+                        Noticing your focus has shifted and gently bringing it back to your breath is an essential part of the meditation. Tap the correct side (or press the correct key) to silence the beep and resume your practice.
+                    </p>
+                </div>
+
+            </div>
+
+            <button id="close-instructions-btn" class="absolute top-4 right-4 p-2 text-gray-600 hover:text-gray-800 transition duration-150 rounded-full bg-gray-100 hover:bg-gray-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
 </body>
 </html>
