@@ -1,0 +1,19 @@
+{
+
+  "name": "mindful tap",
+  "short_name": "mft",
+
+  "description": "meditation game",
+  "scope": "/mindful_tap/",
+  "start_url": "/mindful_tap/",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff",
+  "display": "standalone",
+  "icons": [
+      {
+        "src": "/mindful_tap/icon.png",
+        "type": "image/png",
+        "sizes": "700x700"
+      }
+  ]
+}
