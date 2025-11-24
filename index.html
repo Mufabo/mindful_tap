@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>mindful tap</title>
-    <link rel="icon" type="image/x-icon" href="/icon.png">
+    <title>Mindful Tap Meditation Game</title>
+    <!-- FAVICON: Inlined SVG from icon.html for sharp, scalable icon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='#E0F2FE'/><circle cx='50' cy='50' r='10' fill='#3B82F6'/><path d='M 50 10 L 50 40 M 50 60 L 50 90' stroke='#3B82F6' stroke-width='2' stroke-linecap='round' stroke-dasharray='5,5'/><g transform='translate(20 50) rotate(-45)'><rect x='-5' y='-5' width='20' height='20' rx='4' fill='#1D4ED8'/></g><g transform='translate(80 50) rotate(45)'><rect x='-15' y='-5' width='20' height='20' rx='4' fill='#1D4ED8'/></g><line x1='30' y1='50' x2='70' y2='50' stroke='#3B82F6' stroke-width='3' stroke-linecap='round'/><filter id='shadow'><feDropShadow dx='0' dy='0' stdDeviation='3' flood-color='#3B82F6' flood-opacity='0.5'/></filter><text x='50' y='55' font-family='Inter, sans-serif' font-size='12' fill='#FFFFFF' text-anchor='middle' font-weight='bold' filter='url(#shadow)'>TAP</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -227,7 +228,10 @@
             }
         }
 
-        function playGong() {
+        /**
+         * Plays a single resonant gong tone.
+         */
+        function playSingleGong() {
             try {
                 audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
 
@@ -254,6 +258,23 @@
                 console.warn("Audio API not supported or failed to play gong tone:", e);
             }
         }
+
+        /**
+         * Plays the gong sound three times with a delay and vibrates three times.
+         */
+        function playGongSequence() {
+            const numGongs = 3;
+            const delayMs = 2500; // Delay between gongs (2.5 seconds)
+            const vibrationDuration = 500; // Duration of each vibration pulse
+
+            for (let i = 0; i < numGongs; i++) {
+                setTimeout(() => {
+                    playSingleGong();
+                    // Vibrate concurrently with the gong
+                    triggerVibration(vibrationDuration);
+                }, i * delayMs);
+            }
+        }
     </script>
 
     <!-- 3. GAME CORE LOGIC & UI UPDATES -->
@@ -275,7 +296,7 @@
             const longestStreakDisplay = document.getElementById('longest-streak-display');
             const startBtn = document.getElementById('start-btn');
             const stopBtn = document.getElementById('stop-btn');
-            const pauseBtn = document.getElementById('pause-btn'); // NEW
+            const pauseBtn = document.getElementById('pause-btn');
             const modalDtnDisplay = document.getElementById('modal-dtn-display');
             const timeRemainingDisplay = document.getElementById('time-remaining-display');
             const sessionTimeDisplay = document.getElementById('session-time-display');
@@ -381,9 +402,9 @@
 
             const finalStreak = state.currentStreak;
 
-            // Play gong if session completed automatically
+            // Play gong sequence if session completed automatically
             if (trigger === 'complete') {
-                playGong();
+                playGongSequence(); // Calls the function that plays 3 gongs and vibrates 3 times
             }
 
             // Save streak if it's a record
@@ -763,7 +784,7 @@
 
     <!-- Header -->
     <header class="w-full max-w-4xl text-center mb-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Mindful tap: Breath Focus Game</h1>
+        <h1 class="text-3xl font-bold text-gray-800 mb-2">Mindful Tap: Breath Focus Game</h1>
         <p class="text-sm text-gray-600 mb-4">
             A tool to anchor your mind to your breath. Observe your breath, then tap the required side.
         </p>
@@ -900,7 +921,7 @@
     <!-- Instructions Modal Screen -->
     <div id="instructions-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
         <div class="bg-white w-full max-w-3xl p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Instructions</h2>
+            <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Mindful Tap Instructions</h2>
 
             <div class="text-gray-700 text-base space-y-4">
                 <p>Before starting, take a comfortable position. You may close your eyes if you wish.</p>
