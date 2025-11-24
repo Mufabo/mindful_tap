@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -12,7 +12,7 @@
 
         /* Apply button styling to match the previous div structure, ensuring it fills the flex area */
         .side-tap-area {
-            transition: background-color 0.2s, box-shadow 0.2s;
+            transition: background-color 0.2s, box-shadow 0.2s, color 0.2s;
             cursor: pointer;
             user-select: none;
             touch-action: manipulation;
@@ -37,16 +37,25 @@
             transform: scale(0.99);
         }
 
-        /* Ensure the base background color is set on the button */
-        #left-area-btn { background-color: #e5e7eb; } /* gray-200 */
-        #right-area-btn { background-color: #e5e7eb; } /* gray-200 */
+        /* Dark mode defaults for tap areas (since dark mode is now permanent) */
+        #left-area-btn { background-color: #374151; } /* gray-700 */
+        #right-area-btn { background-color: #374151; } /* gray-700 */
 
         .beeping-bg {
             animation: pulse-bg 1s infinite alternate;
         }
-        @keyframes pulse-bg {
-            0% { background-color: #fca5a5; } /* Red-300 */
-            100% { background-color: #ef4444; } /* Red-500 */
+        /* Keep pulse colors high contrast */
+        /* Dark mode pulse animation remains */
+        .beeping-bg {
+            animation: dark-pulse-bg 1s infinite alternate;
+        }
+        @keyframes pulse-bg { /* Keeping the light mode pulse definition for robustness, although unused */
+            0% { background-color: #fca5a5; }
+            100% { background-color: #ef4444; }
+        }
+        @keyframes dark-pulse-bg {
+             0% { background-color: #b91c1c; } /* Red-700 */
+            100% { background-color: #dc2626; } /* Red-600 */
         }
     </style>
 
@@ -779,7 +788,7 @@
         };
     </script>
 </head>
-<body class="bg-gray-50 min-h-screen flex flex-col items-center p-4">
+<body class="bg-gray-900 min-h-screen flex flex-col items-center p-4 transition-colors duration-300">
 
     <!-- Header -->
     <header class="w-full max-w-4xl text-center mb-8">
@@ -790,7 +799,7 @@
     </header>
 
     <!-- Game Status and Controls -->
-    <div class="w-full max-w-4xl bg-white p-6 rounded-lg shadow-xl mb-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0">
+    <div class="w-full max-w-4xl bg-gray-800 p-6 rounded-lg shadow-xl mb-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 transition-colors duration-300">
         <div id="status-display" class="text-lg font-semibold text-gray-700">Status: Idle</div>
 
         <!-- Central display for Streak and Timer -->
