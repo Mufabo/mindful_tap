@@ -11,9 +11,9 @@
   "display": "standalone",
   "icons": [
       {
-        "src": "/mindful_tap/icon.png",
-        "type": "image/png",
-        "sizes": "700x700"
+        "src": "icon.svg",
+        "type": "image/svg",
+        "sizes": "512x512"
       }
   ]
 }
