@@ -1,10 +1,11 @@
 <!DOCTYPE html>
-<html lang="en" class="dark">
+<html lang="en" class="dark"> <!-- Permanently set dark class on HTML -->
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> <!-- Prevent zooming on mobile -->
     <title>Mindful Tap Meditation Game</title>
-    <link rel="icon" type="image/svg" src="icon.svg">
+    <!-- FAVICON: Inlined SVG from icon.html for sharp, scalable icon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='#E0F2FE'/><circle cx='50' cy='50' r='10' fill='#3B82F6'/><path d='M 50 10 L 50 40 M 50 60 L 50 90' stroke='#3B82F6' stroke-width='2' stroke-linecap='round' stroke-dasharray='5,5'/><g transform='translate(20 50) rotate(-45)'><rect x='-5' y='-5' width='20' height='20' rx='4' fill='#1D4ED8'/></g><g transform='translate(80 50) rotate(45)'><rect x='-15' y='-5' width='20' height='20' rx='4' fill='#1D4ED8'/></g><line x1='30' y1='50' x2='70' y2='50' stroke='#3B82F6' stroke-width='3' stroke-linecap='round'/><filter id='shadow'><feDropShadow dx='0' dy='0' stdDeviation='3' flood-color='#3B82F6' flood-opacity='0.5'/></filter><text x='50' y='55' font-family='Inter, sans-serif' font-size='12' fill='#FFFFFF' text-anchor='middle' font-weight='bold' filter='url(#shadow)'>TAP</text></svg>">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -25,16 +26,18 @@
             border: none;
             background-color: transparent; /* Reset default button background */
             padding: 1rem;
+            -webkit-tap-highlight-color: transparent; /* Remove mobile tap highlight */
         }
 
         .side-tap-area.expected {
             /* Highlight when the expected side is active */
             box-shadow: 0 0 20px 5px rgba(59, 130, 246, 0.7); /* Blue glow */
+            z-index: 10; /* Ensure glow is on top */
         }
 
         .side-tap-area:active {
             filter: brightness(0.9);
-            transform: scale(0.99);
+            transform: scale(0.98); /* Subtle press effect */
         }
 
         /* Dark mode defaults for tap areas (since dark mode is now permanent) */
@@ -57,6 +60,38 @@
              0% { background-color: #b91c1c; } /* Red-700 */
             100% { background-color: #dc2626; } /* Red-600 */
         }
+
+        .stats-header {
+            cursor: pointer;
+            user-select: none;
+            padding: 0.5rem;
+            border-bottom: 2px solid #374151;
+            transition: background-color 0.15s;
+        }
+        .stats-header:hover {
+            background-color: #374151;
+        }
+
+        /* Heatmap Styles */
+        .heatmap-grid {
+            display: grid;
+            grid-auto-flow: column;
+            grid-template-rows: repeat(7, 1fr);
+            gap: 3px;
+        }
+        .heat-cell {
+            width: 14px;
+            height: 14px;
+            border-radius: 2px;
+            background-color: #1F2937; /* gray-800 - Level 0 */
+            transition: background-color 0.3s;
+        }
+        /* Color Levels based on minutes */
+        .level-1 { background-color: #4F46E5 !important; } /* Indigo-600 */
+        .level-2 { background-color: #6366F1 !important; } /* Indigo-500 */
+        .level-3 { background-color: #818CF8 !important; } /* Indigo-400 */
+        .level-4 { background-color: #A5B4FC !important; } /* Indigo-300 */
+
     </style>
 
     <!-- 1. STATE & PERSISTENCE -->
@@ -66,6 +101,7 @@
         const DEFAULT_INACTIVITY_MS = 30000; // 30 seconds default
         const SESSION_DURATION_DEFAULT_MINUTES = 10;
         const LOCAL_STORAGE_KEY = 'mindfulTapSettings'; // Key for localStorage
+        const HISTORY_STORAGE_KEY = 'mindfulTapHistory'; // NEW: Key for history
 
         const state = {
             dtn: DTN_DEFAULT,
@@ -83,6 +119,15 @@
             tapTimer: null, // Timer for the focus window (inactivity reset)
             isBeeping: false,
             isAwaitingSecondTap: false, // Tracks if the first tap of the DTN double sequence has occurred.
+
+            // Stats tracking for current session
+            currentSession: {
+                startTime: 0,
+                totalTaps: 0,
+                mistakes: 0,
+                inactivityResets: 0,
+                longestStreak: 0,
+            },
 
             // Timers for display and session management
             timeRemaining: DEFAULT_INACTIVITY_MS / 1000, // Breath window seconds remaining
@@ -106,7 +151,6 @@
                     state.isVibrationEnabled = data.isVibrationEnabled !== undefined ? data.isVibrationEnabled : false;
                 } catch (e) {
                     console.error("Error parsing settings from localStorage:", e);
-                    // Fallback to defaults
                 }
             }
 
@@ -131,6 +175,17 @@
                 isVibrationEnabled: isVibrationEnabled,
             };
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(settings));
+        }
+
+        function getSessionHistory() {
+            const history = localStorage.getItem(HISTORY_STORAGE_KEY);
+            return history ? JSON.parse(history) : [];
+        }
+
+        function saveSessionToHistory(sessionData) {
+            const history = getSessionHistory();
+            history.push(sessionData);
+            localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(history));
         }
     </script>
 
@@ -295,6 +350,15 @@
             return `${minutes}:${paddedSeconds}`;
         }
 
+        function formatSessionDuration(totalSeconds) {
+            if (totalSeconds < 60) return `${totalSeconds}s`;
+            const minutes = Math.floor(totalSeconds / 60);
+            const remainingSeconds = totalSeconds % 60;
+            if (remainingSeconds === 0) return `${minutes}m`;
+            return `${minutes}m ${remainingSeconds}s`;
+        }
+
+
         // --- Game Logic Functions ---
         function updateUI(statusOverride = null) {
             const leftArea = document.getElementById('left-area-btn');
@@ -312,7 +376,7 @@
             // 1. Game State and Buttons
             let currentStatus = `Status: ${state.gameState.toUpperCase()}`;
             if (statusOverride === 'complete') {
-                currentStatus = '<span class="text-green-600 font-bold">Session Complete!</span>';
+                currentStatus = '<span class="text-green-500 font-bold">Session Complete!</span>';
             }
 
             const isGameActive = state.gameState === 'running' || state.gameState === 'paused';
@@ -366,7 +430,8 @@
                         breathStatus = `Breath ${state.dtn}/${state.dtn}`;
                     }
 
-                    statusDisplay.innerHTML = `${breathStatus} | <span class="text-blue-600">${state.expectedSide.toUpperCase()} (${tapText})</span>`;
+                    // Removed dark mode text classes as body/parent elements handle them
+                    statusDisplay.innerHTML = `${breathStatus} | <span class="text-blue-500">${state.expectedSide.toUpperCase()} (${tapText})</span>`;
                 }
             }
 
@@ -393,9 +458,16 @@
             }
         }
 
-        // Stops the session, resets all timers, and transitions to idle/complete state.
+        /**
+         * Finalizes the session, logs data, and resets state.
+         * @param {('manual'|'complete')} trigger
+         */
         function stopMeditation(trigger = 'manual') {
             stopBeeping();
+
+            // Store duration before clearing timers
+            const sessionEndTimestamp = Date.now();
+            const sessionTotalTimeSeconds = state.sessionDurationMinutes * 60 - state.sessionTimeRemainingSeconds;
 
             // Clear all timers
             clearTimeout(state.tapTimer);
@@ -409,6 +481,27 @@
             state.sessionCountdownInterval = null;
 
             const finalStreak = state.currentStreak;
+
+            // Log session history
+            const hitRate = (state.currentSession.totalTaps > 0)
+                ? (state.currentSession.totalTaps / (state.currentSession.totalTaps + state.currentSession.mistakes + state.currentSession.inactivityResets))
+                : 0;
+
+            const sessionData = {
+                date: new Date(sessionEndTimestamp).toLocaleString(),
+                duration: formatSessionDuration(sessionTotalTimeSeconds),
+                durationSeconds: sessionTotalTimeSeconds,
+                dtn: state.dtn,
+                totalTaps: state.currentSession.totalTaps,
+                mistakes: state.currentSession.mistakes,
+                inactivityResets: state.currentSession.inactivityResets,
+                finalStreak: finalStreak,
+                hitRate: (hitRate * 100).toFixed(1) + '%',
+            };
+
+            if (sessionTotalTimeSeconds > 5) { // Only log meaningful sessions
+                saveSessionToHistory(sessionData);
+            }
 
             // Play gong sequence if session completed automatically
             if (trigger === 'complete') {
@@ -427,6 +520,9 @@
             state.expectedTapType = 'single'; // Reset tap type
             state.cycleStartSide = 'right';
             state.isAwaitingSecondTap = false; // Reset DTN sequence flag
+
+            // Reset current session tracking
+            state.currentSession = { startTime: 0, totalTaps: 0, mistakes: 0, inactivityResets: 0, longestStreak: 0 };
 
             // Set final game state and update UI
             state.gameState = 'idle';
@@ -479,14 +575,21 @@
         function resetFocus(trigger) {
             console.log(`Resetting focus due to: ${trigger}`);
 
-            // Play mistake tone if reset was due to an input error
+            // Track mistakes for statistics
             if (trigger === 'mistake') {
                 playMistakeTone();
+                state.currentSession.mistakes++;
+            } else if (trigger === 'inactivity') {
+                state.currentSession.inactivityResets++;
             }
 
             // Save current streak if it's the longest
             if (state.currentStreak > state.longestStreak) {
                 saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, state.currentStreak, state.hideStatus, state.isVibrationEnabled);
+            }
+            // Also update current session longest streak
+            if (state.currentStreak > state.currentSession.longestStreak) {
+                state.currentSession.longestStreak = state.currentStreak;
             }
 
             // Reset breath/streak counters
@@ -504,6 +607,16 @@
                 state.gameState = 'running';
                 startTapTimer();
             }
+
+            // Start time tracking for new session
+            if (trigger === 'start') {
+                state.currentSession.startTime = Date.now();
+                state.currentSession.longestStreak = 0;
+                state.currentSession.mistakes = 0;
+                state.currentSession.totalTaps = 0;
+                state.currentSession.inactivityResets = 0;
+            }
+
 
             updateUI();
         }
@@ -566,6 +679,7 @@
          * Only called when a *breath* (either single tap or successful double-tap sequence) is complete.
          */
         function advanceBreath() {
+            state.currentSession.totalTaps++; // Track successful tap
             state.currentStreak++;
 
             if (state.expectedTapType === 'double') {
@@ -590,6 +704,163 @@
             // Successfully processed, restart breath window timer
             startTapTimer();
         }
+
+        // NEW: Function to aggregate historical data into daily minutes
+        function getDailyActivity() {
+            const history = getSessionHistory();
+            const dailyActivity = {}; // Key: YYYY-MM-DD, Value: total duration in minutes
+
+            history.forEach(session => {
+                // Date format is already localized string, needs parsing
+                // Assuming session.date is a string like "12/8/2025, 6:47:21 PM"
+                const date = new Date(session.date);
+                // Format date as YYYY-MM-DD
+                const dateKey = date.toISOString().split('T')[0];
+                const durationMinutes = Math.ceil(session.durationSeconds / 60);
+
+                if (dailyActivity[dateKey]) {
+                    dailyActivity[dateKey] += durationMinutes;
+                } else {
+                    dailyActivity[dateKey] = durationMinutes;
+                }
+            });
+            return dailyActivity;
+        }
+
+        // NEW: Function to render the GitHub-like heatmap
+        function renderHeatmap() {
+            const container = document.getElementById('heatmap-container');
+            if (!container) return;
+
+            container.innerHTML = '';
+            const dailyActivity = getDailyActivity();
+
+            const today = new Date();
+            // FIX 1: Corrected variable name
+            const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate() + 1);
+
+            const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+            // Add day labels (Sun, Mon, etc.)
+            const dayLabels = document.createElement('div');
+            dayLabels.className = 'grid grid-rows-7 gap-3 mr-1 text-xs text-gray-400';
+            daysOfWeek.forEach((day, index) => {
+                if (index === 0 || index === 2 || index === 4 || index === 6) { // Only show Sun, Tue, Thu, Sat
+                     const label = document.createElement('div');
+                     label.textContent = day;
+                     label.className = 'h-3 text-center leading-3';
+                     dayLabels.appendChild(label);
+                } else {
+                     const empty = document.createElement('div');
+                     empty.className = 'h-3';
+                     dayLabels.appendChild(empty);
+                }
+            });
+            container.appendChild(dayLabels);
+
+            // Create the main grid container
+            const grid = document.createElement('div');
+            grid.className = 'heatmap-grid flex-1';
+
+            // FIX 1: Use corrected variable name
+            let currentDate = new Date(oneYearAgo);
+            currentDate.setHours(0, 0, 0, 0); // Normalize to start of day
+
+            const cells = [];
+            const dayCount = 365;
+
+            // Generate cells for the entire year
+            for (let i = 0; i < dayCount; i++) {
+                const dateKey = currentDate.toISOString().split('T')[0];
+                const minutes = dailyActivity[dateKey] || 0;
+
+                const cell = document.createElement('div');
+                cell.className = 'heat-cell';
+                cell.setAttribute('title', `${minutes} min on ${dateKey}`);
+
+                // Determine activity level based on minutes
+                let level = 0;
+                if (minutes >= 31) {
+                    level = 1; // Indigo-600 (Darkest)
+                } else if (minutes >= 16) {
+                    level = 2; // Indigo-500
+                } else if (minutes >= 1) {
+                    level = 3; // Indigo-400
+                }
+
+                if (level > 0) {
+                    // Note: Levels are reversed for visual effect: 1=highest activity, 4=lowest visible activity
+                    cell.classList.add(`level-${4 - level}`);
+                }
+
+                cells.push(cell);
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+
+            // Determine the starting day of the grid (Sunday = 0)
+            // FIX 1: Use corrected variable name
+            const firstDayOfWeek = new Date(oneYearAgo).getDay();
+
+            // Create dummy cells for alignment (to start grid properly on Sunday)
+            for (let i = 0; i < firstDayOfWeek; i++) {
+                 const dummy = document.createElement('div');
+                 dummy.className = 'heat-cell invisible';
+                 grid.appendChild(dummy);
+            }
+
+            // Append all generated cells
+            cells.forEach(cell => grid.appendChild(cell));
+            container.appendChild(grid);
+        }
+
+        // NEW: Stats Rendering Function
+        function renderStats() {
+            const history = getSessionHistory();
+            const tableBody = document.getElementById('stats-table-body');
+
+            // Clear existing rows
+            tableBody.innerHTML = '';
+
+            if (history.length === 0) {
+                tableBody.innerHTML = '<tr><td colspan="5" class="p-4 text-center text-gray-400">No meditation sessions logged yet.</td></tr>';
+                return;
+            }
+
+            // Reverse history to show latest sessions first
+            const reversedHistory = history.slice().reverse();
+
+            reversedHistory.forEach((session, index) => {
+                const row = tableBody.insertRow();
+                row.className = index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-700';
+
+                // Date
+                row.insertCell().textContent = session.date;
+
+                // Duration
+                row.insertCell().textContent = session.duration;
+
+                // DTN
+                row.insertCell().textContent = session.dtn;
+
+                // Hit Rate
+                const hitRateCell = row.insertCell();
+                hitRateCell.textContent = session.hitRate;
+
+                // Color code hit rate
+                const rate = parseFloat(session.hitRate);
+                if (rate >= 90) {
+                    hitRateCell.classList.add('text-green-400', 'font-bold');
+                } else if (rate >= 70) {
+                    hitRateCell.classList.add('text-yellow-400');
+                } else {
+                    hitRateCell.classList.add('text-red-400');
+                }
+
+                // Longest Streak
+                row.insertCell().textContent = session.finalStreak;
+            });
+        }
     </script>
 
     <!-- 4. INPUT AND EVENT HANDLERS -->
@@ -601,6 +872,7 @@
             // Prevent interaction if modals are open or game is idle/complete/paused
             if (document.getElementById('instructions-modal').classList.contains('hidden') === false ||
                 document.getElementById('settings-modal').classList.contains('hidden') === false ||
+                document.getElementById('stats-modal').classList.contains('hidden') === false ||
                 state.gameState === 'paused' || state.gameState === 'idle' || state.gameState === 'complete') {
                 return;
             }
@@ -688,6 +960,16 @@
             updateUI();
         }
 
+        function closeStats() { // NEW
+            document.getElementById('stats-modal').classList.add('hidden');
+        }
+
+        function openStats() {
+            renderStats();
+            renderHeatmap(); // Render the heatmap when opening stats
+            document.getElementById('stats-modal').classList.remove('hidden');
+        }
+
         // --- Initialization ---
 
         window.onload = function() {
@@ -705,6 +987,8 @@
             document.getElementById('close-instructions-btn').addEventListener('click', closeInstructions);
             document.getElementById('settings-btn').addEventListener('click', openSettings);
             document.getElementById('close-settings-btn').addEventListener('click', closeSettings);
+            document.getElementById('stats-btn').addEventListener('click', openStats); // NEW
+            document.getElementById('close-stats-btn').addEventListener('click', closeStats); // NEW
 
             // Add event listeners for control buttons
             document.getElementById('start-btn').addEventListener('click', () => {
@@ -719,7 +1003,7 @@
             });
 
             document.getElementById('stop-btn').addEventListener('click', () => stopMeditation('manual'));
-            document.getElementById('pause-btn').addEventListener('click', pauseMeditation); // NEW
+            document.getElementById('pause-btn').addEventListener('click', pauseMeditation);
 
             document.getElementById('save-settings-btn').addEventListener('click', () => {
                 const dtnInput = document.getElementById('dtn-input');
@@ -788,29 +1072,32 @@
         };
     </script>
 </head>
-<body class="bg-gray-900 min-h-screen flex flex-col items-center p-4 transition-colors duration-300">
+<body class="bg-gray-900 min-h-screen flex flex-col items-center p-4 transition-colors duration-300 h-screen overflow-hidden"> <!-- Permanently set dark background + full screen -->
 
     <!-- Header -->
-    <header class="w-full max-w-4xl text-center mb-8">
-        <h1 class="text-3xl font-bold text-gray-800 mb-2">Mindful Tap: Breath Focus Game</h1>
-        <p class="text-sm text-gray-600 mb-4">
+    <header class="w-full max-w-4xl text-center mb-2 md:mb-8 flex-none">
+        <h1 class="text-3xl font-bold text-gray-100 mb-2">Mindful Tap: Breath Focus Game</h1>
+        <p class="text-sm text-gray-400 mb-4">
             A tool to anchor your mind to your breath. Observe your breath, then tap the required side.
         </p>
     </header>
 
     <!-- Game Status and Controls -->
-    <div class="w-full max-w-4xl bg-gray-800 p-6 rounded-lg shadow-xl mb-6 flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 transition-colors duration-300">
-        <div id="status-display" class="text-lg font-semibold text-gray-700">Status: Idle</div>
+    <div class="w-full max-w-4xl bg-gray-800 p-6 rounded-lg shadow-xl mb-4 flex-none flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 transition-colors duration-300">
+        <div id="status-display" class="text-lg font-semibold text-gray-300">Status: Idle</div>
 
         <!-- Central display for Streak and Timer -->
         <div class="text-center space-y-1">
-            <div id="session-time-display" class="text-xl font-bold text-gray-800">Session Time: --:--</div>
-            <div id="time-remaining-display" class="text-sm text-gray-600">Breath Window: --s</div>
+            <div id="session-time-display" class="text-xl font-bold text-gray-100">Session Time: --:--</div>
+            <div id="time-remaining-display" class="text-sm text-gray-400">Breath Window: --s</div>
             <div id="streak-display" class="text-2xl font-extrabold text-indigo-600">Streak: 0</div>
-            <div id="longest-streak-display" class="text-sm text-gray-500">Longest: 0</div>
+            <div id="longest-streak-display" class="text-sm text-gray-400">Longest: 0</div>
         </div>
 
-        <div class="flex space-x-4">
+        <div class="flex flex-wrap justify-center gap-2 md:gap-4 w-full md:w-auto">
+            <button id="stats-btn" class="px-4 py-3 bg-purple-500 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-purple-600 transition duration-200 transform hover:scale-105">
+                Stats
+            </button>
             <button id="settings-btn" class="px-4 py-3 bg-blue-500 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-blue-600 transition duration-200 transform hover:scale-105">
                 Settings
             </button>
@@ -818,7 +1105,7 @@
                 ? Instructions
             </button>
 
-            <!-- NEW Pause Button -->
+            <!-- Pause Button -->
             <button id="pause-btn" class="px-8 py-3 bg-yellow-600 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-yellow-700 transition duration-200 transform hover:scale-105 hidden">
                 Pause
             </button>
@@ -839,21 +1126,21 @@
     <audio id="audio-player" class="hidden"></audio>
 
     <!-- Main Tap Area -->
-    <main id="game-area" class="w-full max-w-4xl flex flex-col md:flex-row h-96 rounded-xl overflow-hidden shadow-2xl transition duration-500">
+    <main id="game-area" class="flex-1 w-full max-w-4xl flex flex-col md:flex-row rounded-xl overflow-hidden shadow-2xl transition duration-500 min-h-0">
 
         <!-- Left Tap Area Button -->
-        <button id="left-area-btn" class="side-tap-area flex-1 border-r md:border-b-0 border-gray-300" data-side="left">
+        <button id="left-area-btn" class="side-tap-area flex-1 border-b md:border-r md:border-b-0 border-gray-700" data-side="left">
             <div class="text-center">
-                <p class="text-3xl font-bold text-gray-800">Left Tap</p>
-                <p class="text-xl text-gray-600 mt-1">(Key: F)</p>
+                <p class="text-3xl font-bold text-gray-100">Left Tap</p>
+                <p class="text-xl text-gray-300 mt-1">(Key: F)</p>
             </div>
         </button>
 
         <!-- Right Tap Area Button -->
         <button id="right-area-btn" class="side-tap-area flex-1" data-side="right">
             <div class="text-center">
-                <p class="text-3xl font-bold text-gray-800">Right Tap</p>
-                <p class="text-xl text-gray-600 mt-1">(Key: J)</p>
+                <p class="text-3xl font-bold text-gray-100">Right Tap</p>
+                <p class="text-xl text-gray-300 mt-1">(Key: J)</p>
             </div>
         </button>
 
@@ -861,54 +1148,54 @@
 
     <!-- Settings Modal Screen -->
     <div id="settings-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
-        <div class="bg-white w-full max-w-md p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-2">Game Settings</h2>
+        <div class="bg-gray-800 text-gray-100 w-11/12 max-w-md p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto transition-colors duration-300">
+            <h2 class="text-2xl font-bold mb-6 border-b pb-2 border-gray-700">Game Settings</h2>
 
             <div class="space-y-6">
 
                 <!-- Session Duration Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
-                    <label for="session-duration-input" class="text-gray-700 font-medium text-lg">Session Duration:</label>
+                <div class="flex flex-col space-y-2 bg-gray-700 p-4 rounded-lg">
+                    <label for="session-duration-input" class="font-medium text-lg">Session Duration:</label>
                     <div class="flex items-center space-x-2">
-                         <input id="session-duration-input" type="number" value="10" min="1" max="180" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
-                         <span class="text-gray-600 font-medium">minutes</span>
+                         <input id="session-duration-input" type="number" value="10" min="1" max="180" class="w-full p-2 border border-gray-600 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-900 text-white">
+                         <span class="text-gray-300 font-medium">minutes</span>
                     </div>
-                    <p class="text-sm text-gray-500">The total time the meditation will run (1-180 min).</p>
+                    <p class="text-sm text-gray-400">The total time the meditation will run (1-180 min).</p>
                 </div>
 
                 <!-- Focus Window Duration Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
-                    <label for="duration-input" class="text-gray-700 font-medium text-lg">Focus Window Duration:</label>
+                <div class="flex flex-col space-y-2 bg-gray-700 p-4 rounded-lg">
+                    <label for="duration-input" class="font-medium text-lg">Focus Window Duration:</label>
                     <div class="flex items-center space-x-2">
-                         <input id="duration-input" type="number" value="30" min="5" max="180" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
-                         <span class="text-gray-600 font-medium">seconds</span>
+                         <input id="duration-input" type="number" value="30" min="5" max="180" class="w-full p-2 border border-gray-600 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-900 text-white">
+                         <span class="text-gray-300 font-medium">seconds</span>
                     </div>
-                    <p class="text-sm text-gray-500">Time (in seconds) allowed between taps before focus reset.</p>
+                    <p class="text-sm text-gray-400">Time (in seconds) allowed between taps before focus reset.</p>
                 </div>
 
                 <!-- DTN Setting (Now Cycle Length) -->
-                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
-                    <label for="dtn-input" class="text-gray-700 font-medium text-lg">Double Tap Number (DTN):</label>
-                    <input id="dtn-input" type="number" value="5" min="2" class="w-full p-2 border border-gray-300 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500">
-                    <p class="text-sm text-gray-500">The cycle length. The DTN-th breath will require a double tap on the required side, after which the alternating pattern flips.</p>
+                <div class="flex flex-col space-y-2 bg-gray-700 p-4 rounded-lg">
+                    <label for="dtn-input" class="font-medium text-lg">Double Tap Number (DTN):</label>
+                    <input id="dtn-input" type="number" value="5" min="2" class="w-full p-2 border border-gray-600 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-900 text-white">
+                    <p class="text-sm text-gray-400">The cycle length. The DTN-th breath will require a double tap on the required side, after which the alternating pattern flips.</p>
                 </div>
 
                 <!-- Hide Status Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
-                    <label for="hide-status-input" class="text-gray-700 font-medium text-lg flex items-center justify-between">
+                <div class="flex flex-col space-y-2 bg-gray-700 p-4 rounded-lg">
+                    <label for="hide-status-input" class="font-medium text-lg flex items-center justify-between">
                         Hide Status Display
-                        <input id="hide-status-input" type="checkbox" class="h-6 w-6 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <input id="hide-status-input" type="checkbox" class="h-6 w-6 text-blue-600 border-gray-600 rounded focus:ring-blue-500">
                     </label>
-                    <p class="text-sm text-gray-500">Hide the detailed "Status" line during meditation for a cleaner view.</p>
+                    <p class="text-sm text-gray-400">Hide the detailed "Status" line during meditation for a cleaner view.</p>
                 </div>
 
-                <!-- NEW: Vibration Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-50 p-4 rounded-lg">
-                    <label for="vibration-input" class="text-gray-700 font-medium text-lg flex items-center justify-between">
+                <!-- Vibration Setting -->
+                <div class="flex flex-col space-y-2 bg-gray-700 p-4 rounded-lg">
+                    <label for="vibration-input" class="font-medium text-lg flex items-center justify-between">
                         Enable Vibration Feedback
-                        <input id="vibration-input" type="checkbox" class="h-6 w-6 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
+                        <input id="vibration-input" type="checkbox" class="h-6 w-6 text-blue-600 border-gray-600 rounded focus:ring-blue-500">
                     </label>
-                    <p class="text-sm text-gray-500">Triggers device vibration for focus resets and mistakes (requires compatible device).</p>
+                    <p class="text-sm text-gray-400">Triggers device vibration for focus resets and mistakes (requires compatible device).</p>
                 </div>
 
             </div>
@@ -918,7 +1205,7 @@
             </button>
 
 
-            <button id="close-settings-btn" class="absolute top-4 right-4 p-2 text-gray-600 hover:text-gray-800 transition duration-150 rounded-full bg-gray-100 hover:bg-gray-200">
+            <button id="close-settings-btn" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-200 transition duration-150 rounded-full bg-gray-700 hover:bg-gray-600">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -928,31 +1215,31 @@
 
     <!-- Instructions Modal Screen -->
     <div id="instructions-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
-        <div class="bg-white w-full max-w-3xl p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto">
-            <h2 class="text-3xl font-bold text-gray-800 mb-6 border-b pb-2">Mindful Tap Instructions</h2>
+        <div class="bg-gray-800 text-gray-100 w-11/12 max-w-3xl p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto transition-colors duration-300">
+            <h2 class="text-3xl font-bold text-gray-100 mb-6 border-b pb-2 border-gray-700">Mindful Tap Instructions</h2>
 
-            <div class="text-gray-700 text-base space-y-4">
+            <div class="text-base space-y-4">
                 <p>Before starting, take a comfortable position. You may close your eyes if you wish.</p>
 
-                <div class="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                    <h3 class="font-semibold text-lg text-blue-700 mb-2">The Basic Rhythm:</h3>
+                <div class="bg-blue-900 p-4 rounded-lg border border-blue-700">
+                    <h3 class="font-semibold text-lg text-blue-400 mb-2">The Basic Rhythm:</h3>
                     <p class="mb-2">Observe your complete breath cycle (in-breath and out-breath).</p>
                     <ul class="list-disc list-inside space-y-1 ml-4">
                         <li>After each completed breath, tap the screen or press a key.</li>
-                        <li>The required tap side alternates: <span class="font-bold text-gray-900">Right (J key)</span> then <span class="font-bold text-gray-900">Left (F key)</span>.</li>
-                        <li>The meditation starts with a tap on the <span class="font-bold text-blue-600">Right side</span>.</li>
+                        <li>The required tap side alternates: <span class="font-bold text-gray-100">Right (J key)</span> then <span class="font-bold text-gray-100">Left (F key)</span>.</li>
+                        <li>The meditation starts with a tap on the <span class="font-bold text-blue-400">Right side</span>.</li>
                     </ul>
                 </div>
 
-                <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
-                    <h3 class="font-semibold text-lg text-yellow-700 mb-2">Double Tap Cycle (DTN):</h3>
-                    <p>On every DTN-th breath (currently set to <span id="modal-dtn-display" class="font-bold text-red-600">5</span>), you must perform a <span class="font-bold text-red-600">DOUBLE TAP</span> on the required side.</p>
-                    <p class="text-sm italic mt-1">Example (DTN=5): B1 (Right, single), B2 (Left, single), B3 (Right, single), B4 (Left, single), B5 (<span class="font-bold text-red-600">Right, double tap sequence</span>). This means two separate taps on the Right side are required for this breath. The side does not flip until the double tap sequence is complete. Then, restart counting (B1) with the opposite side (Left).</p>
-                    <p class="text-sm mt-2 font-semibold text-gray-800">Note: Double tap requires two quick, separate taps/key presses on the same side.</p>
+                <div class="bg-yellow-900 p-4 rounded-lg border border-yellow-700">
+                    <h3 class="font-semibold text-lg text-yellow-400 mb-2">Double Tap Cycle (DTN):</h3>
+                    <p>On every DTN-th breath (currently set to <span id="modal-dtn-display" class="font-bold text-red-400">5</span>), you must perform a <span class="font-bold text-red-400">DOUBLE TAP</span> on the required side.</p>
+                    <p class="text-sm italic mt-1">Example (DTN=5): B1 (Right, single), B2 (Left, single), B3 (Right, single), B4 (Left, single), B5 (<span class="font-bold text-red-400">Right, double tap sequence</span>). This means two separate taps on the Right side are required for this breath. The side does not flip until the double tap sequence is complete. Then, restart counting (B1) with the opposite side (Left).</p>
+                    <p class="text-sm mt-2 font-semibold text-gray-200">Note: Double tap requires two quick, separate taps/key presses on the same side.</p>
                 </div>
 
-                <div class="bg-red-50 p-4 rounded-lg border border-red-200">
-                    <h3 class="font-semibold text-lg text-red-700 mb-2">Focus Reset:</h3>
+                <div class="bg-red-900 p-4 rounded-lg border border-red-700">
+                    <h3 class="font-semibold text-lg text-red-400 mb-2">Focus Reset:</h3>
                     <p class="space-y-1">
                         Any <span class="font-bold">mistake</span> (wrong side) or failing to tap within the <span class="font-bold">Breath Window</span> will:
                         <ul class="list-disc list-inside ml-4">
@@ -968,7 +1255,69 @@
 
             </div>
 
-            <button id="close-instructions-btn" class="absolute top-4 right-4 p-2 text-gray-600 hover:text-gray-800 transition duration-150 rounded-full bg-gray-100 hover:bg-gray-200">
+            <button id="close-instructions-btn" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-200 transition duration-150 rounded-full bg-gray-700 hover:bg-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Stats Modal Screen (NEW) -->
+    <div id="stats-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
+        <div class="bg-gray-800 text-gray-100 w-11/12 max-w-4xl p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto transition-colors duration-300">
+            <h2 class="text-2xl font-bold mb-6 border-b pb-2 border-gray-700 text-purple-400">Session History</h2>
+
+            <!-- Heatmap Visualization -->
+            <div class="mb-8 p-4 bg-gray-900 rounded-lg shadow-inner">
+                <h3 class="text-lg font-semibold mb-3 text-gray-300">Last Year's Consistency (Minutes Meditated)</h3>
+                <div class="flex space-x-2 mb-2 text-xs text-gray-400 overflow-x-auto pb-2"> <!-- Added overflow scroll for heatmap on very small screens -->
+                    <div class="grid grid-rows-7 gap-3 text-center flex-none">
+                        <div class="h-3 leading-3">S</div>
+                        <div class="h-3"></div>
+                        <div class="h-3 leading-3">T</div>
+                        <div class="h-3"></div>
+                        <div class="h-3 leading-3">T</div>
+                        <div class="h-3"></div>
+                        <div class="h-3 leading-3">S</div>
+                    </div>
+                    <div id="heatmap-container" class="flex flex-row flex-wrap flex-1 min-w-[600px]"> <!-- Set min width to ensure grid renders nicely, scrollable container -->
+                        <!-- Heatmap cells inserted by JavaScript -->
+                    </div>
+                </div>
+                <div class="flex justify-between items-center mt-4 text-xs text-gray-400">
+                    <span>Less Activity</span>
+                    <div class="flex items-center space-x-1">
+                        <div class="heat-cell !bg-gray-800"></div>
+                        <div class="heat-cell level-4"></div>
+                        <div class="heat-cell level-3"></div>
+                        <div class="heat-cell level-2"></div>
+                        <div class="heat-cell level-1"></div>
+                        <span>More Activity</span>
+                    </div>
+                </div>
+            </div>
+
+            <h3 class="text-lg font-semibold mb-3 text-gray-300 border-b border-gray-700 pb-2">Session Log</h3>
+
+            <div class="overflow-x-auto">
+                <table class="min-w-full table-auto text-sm text-left text-gray-400">
+                    <thead class="text-xs text-gray-100 uppercase bg-gray-700">
+                        <tr>
+                            <th scope="col" class="py-3 px-6 stats-header">Date</th>
+                            <th scope="col" class="py-3 px-6 stats-header">Duration</th>
+                            <th scope="col" class="py-3 px-6 stats-header">DTN</th>
+                            <th scope="col" class="py-3 px-6 stats-header">Hit Rate</th>
+                            <th scope="col" class="py-3 px-6 stats-header">Longest Streak</th>
+                        </tr>
+                    </thead>
+                    <tbody id="stats-table-body">
+                        <!-- Rows populated by JavaScript -->
+                    </tbody>
+                </table>
+            </div>
+
+            <button id="close-stats-btn" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-200 transition duration-150 rounded-full bg-gray-700 hover:bg-gray-600">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
