@@ -56,17 +56,8 @@
         .beeping-bg {
             animation: pulse-bg 1s infinite alternate;
         }
-        /* Keep pulse colors high contrast */
-        /* Dark mode pulse animation remains */
-        .beeping-bg {
-            animation: dark-pulse-bg 1s infinite alternate;
-        }
-        @keyframes pulse-bg { /* Keeping the light mode pulse definition for robustness, although unused */
-            0% { background-color: #fca5a5; }
-            100% { background-color: #ef4444; }
-        }
-        @keyframes dark-pulse-bg {
-             0% { background-color: #b91c1c; } /* Red-700 */
+        @keyframes pulse-bg {
+            0% { background-color: #b91c1c; } /* Red-700 */
             100% { background-color: #dc2626; } /* Red-600 */
         }
 
@@ -161,15 +152,6 @@
                 } catch (e) {
                     console.error("Error parsing settings from localStorage:", e);
                 }
-            }
-
-            // Update input fields (relies on DOM being ready, handled in window.onload)
-            if (document.readyState === 'complete') {
-                document.getElementById('dtn-input').value = state.dtn;
-                document.getElementById('duration-input').value = state.inactivityDurationMs / 1000;
-                document.getElementById('session-duration-input').value = state.sessionDurationMinutes;
-                document.getElementById('hide-status-input').checked = state.hideStatus;
-                document.getElementById('vibration-input').checked = state.isVibrationEnabled;
             }
         }
 
@@ -745,34 +727,12 @@
             const dailyActivity = getDailyActivity();
 
             const today = new Date();
-            // FIX 1: Corrected variable name
             const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate() + 1);
 
-            const daysOfWeek = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-            // Add day labels (Sun, Mon, etc.)
-            const dayLabels = document.createElement('div');
-            dayLabels.className = 'grid grid-rows-7 gap-3 mr-1 text-xs text-gray-400';
-            daysOfWeek.forEach((day, index) => {
-                if (index === 0 || index === 2 || index === 4 || index === 6) { // Only show Sun, Tue, Thu, Sat
-                     const label = document.createElement('div');
-                     label.textContent = day;
-                     label.className = 'h-3 text-center leading-3';
-                     dayLabels.appendChild(label);
-                } else {
-                     const empty = document.createElement('div');
-                     empty.className = 'h-3';
-                     dayLabels.appendChild(empty);
-                }
-            });
-            container.appendChild(dayLabels);
-
-            // Create the main grid container
+            // Create the main grid container (day labels are already in HTML)
             const grid = document.createElement('div');
             grid.className = 'heatmap-grid flex-1';
 
-            // FIX 1: Use corrected variable name
             let currentDate = new Date(oneYearAgo);
             currentDate.setHours(0, 0, 0, 0); // Normalize to start of day
 
@@ -789,18 +749,20 @@
                 cell.setAttribute('title', `${minutes} min on ${dateKey}`);
 
                 // Determine activity level based on minutes
+                // level-1 = darkest (highest activity), level-4 = lightest (lowest activity)
                 let level = 0;
                 if (minutes >= 31) {
-                    level = 1; // Indigo-600 (Darkest)
+                    level = 1; // Indigo-600 (Darkest - highest activity)
                 } else if (minutes >= 16) {
                     level = 2; // Indigo-500
-                } else if (minutes >= 1) {
+                } else if (minutes >= 6) {
                     level = 3; // Indigo-400
+                } else if (minutes >= 1) {
+                    level = 4; // Indigo-300 (Lightest - lowest activity)
                 }
 
                 if (level > 0) {
-                    // Note: Levels are reversed for visual effect: 1=highest activity, 4=lowest visible activity
-                    cell.classList.add(`level-${4 - level}`);
+                    cell.classList.add(`level-${level}`);
                 }
 
                 cells.push(cell);
@@ -808,7 +770,6 @@
             }
 
             // Determine the starting day of the grid (Sunday = 0)
-            // FIX 1: Use corrected variable name
             const firstDayOfWeek = new Date(oneYearAgo).getDay();
 
             // Create dummy cells for alignment (to start grid properly on Sunday)
@@ -843,17 +804,24 @@
                 const row = tableBody.insertRow();
                 row.className = index % 2 === 0 ? 'bg-gray-800' : 'bg-gray-700';
 
-                // Date
-                row.insertCell().textContent = session.date;
+                // Date - show shorter format on mobile
+                const dateCell = row.insertCell();
+                dateCell.className = 'py-2 px-2 sm:py-3 sm:px-4 md:px-6';
+                dateCell.textContent = session.date;
 
                 // Duration
-                row.insertCell().textContent = session.duration;
+                const durationCell = row.insertCell();
+                durationCell.className = 'py-2 px-2 sm:py-3 sm:px-4 md:px-6';
+                durationCell.textContent = session.duration;
 
-                // DTN
-                row.insertCell().textContent = session.dtn;
+                // DTN - hidden on small screens
+                const dtnCell = row.insertCell();
+                dtnCell.className = 'py-2 px-2 sm:py-3 sm:px-4 md:px-6 hidden sm:table-cell';
+                dtnCell.textContent = session.dtn;
 
                 // Hit Rate
                 const hitRateCell = row.insertCell();
+                hitRateCell.className = 'py-2 px-2 sm:py-3 sm:px-4 md:px-6';
                 hitRateCell.textContent = session.hitRate;
 
                 // Color code hit rate
@@ -867,7 +835,9 @@
                 }
 
                 // Longest Streak
-                row.insertCell().textContent = session.finalStreak;
+                const streakCell = row.insertCell();
+                streakCell.className = 'py-2 px-2 sm:py-3 sm:px-4 md:px-6';
+                streakCell.textContent = session.finalStreak;
             });
         }
     </script>
@@ -878,14 +848,15 @@
          * Main input handling function. All inputs (screen click/key press) are considered single taps.
          */
         function handleTap(actualSide) {
-            // Prevent interaction if modals are open or game is idle/complete/paused
+            // Prevent interaction if modals are open or game is idle/complete
             if (document.getElementById('instructions-modal').classList.contains('hidden') === false ||
                 document.getElementById('settings-modal').classList.contains('hidden') === false ||
                 document.getElementById('stats-modal').classList.contains('hidden') === false ||
-                state.gameState === 'paused' || state.gameState === 'idle' || state.gameState === 'complete') {
+                state.gameState === 'idle' || state.gameState === 'complete') {
                 return;
             }
-            if (state.gameState !== 'running' && state.gameState !== 'paused') return;
+            // Block input if manually paused (not beeping), allow if beeping to resume
+            if (state.gameState === 'paused' && !state.isBeeping) return;
 
             // If in "paused" (beeping) state, only accept correct side to resume
             if (state.isBeeping) {
@@ -1081,51 +1052,51 @@
         };
     </script>
 </head>
-<body class="bg-gray-900 min-h-screen flex flex-col items-center p-4 transition-colors duration-300 h-screen overflow-hidden"> <!-- Permanently set dark background + full screen -->
+<body class="bg-gray-900 min-h-screen flex flex-col items-center p-2 sm:p-4 transition-colors duration-300 h-screen overflow-hidden">
 
     <!-- Header -->
-    <header class="w-full max-w-4xl text-center mb-2 md:mb-8 flex-none">
-        <h1 class="text-3xl font-bold text-gray-100 mb-2">Mindful Tap: Breath Focus Game</h1>
-        <p class="text-sm text-gray-400 mb-4">
-            A tool to anchor your mind to your breath. Observe your breath, then tap the required side.
+    <header class="w-full max-w-4xl text-center mb-2 md:mb-4 flex-none">
+        <h1 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100 mb-1 md:mb-2">Mindful Tap</h1>
+        <p class="text-xs sm:text-sm text-gray-400 hidden sm:block">
+            Anchor your mind to your breath. Observe, then tap.
         </p>
     </header>
 
     <!-- Game Status and Controls -->
-    <div class="w-full max-w-4xl bg-gray-800 p-6 rounded-lg shadow-xl mb-4 flex-none flex flex-col md:flex-row justify-between items-center space-y-4 md:space-y-0 transition-colors duration-300">
-        <div id="status-display" class="text-lg font-semibold text-gray-300">Status: Idle</div>
+    <div class="w-full max-w-4xl bg-gray-800 p-3 sm:p-4 md:p-6 rounded-lg shadow-xl mb-2 sm:mb-4 flex-none flex flex-col md:flex-row justify-between items-center space-y-2 sm:space-y-3 md:space-y-0 transition-colors duration-300">
+        <div id="status-display" class="text-sm sm:text-base md:text-lg font-semibold text-gray-300 order-2 md:order-1">Status: Idle</div>
 
         <!-- Central display for Streak and Timer -->
-        <div class="text-center space-y-1">
-            <div id="session-time-display" class="text-xl font-bold text-gray-100">Session Time: --:--</div>
-            <div id="time-remaining-display" class="text-sm text-gray-400">Breath Window: --s</div>
-            <div id="streak-display" class="text-2xl font-extrabold text-indigo-600">Streak: 0</div>
-            <div id="longest-streak-display" class="text-sm text-gray-400">Longest: 0</div>
+        <div class="text-center space-y-0.5 sm:space-y-1 order-1 md:order-2">
+            <div id="session-time-display" class="text-base sm:text-lg md:text-xl font-bold text-gray-100">Session Time: --:--</div>
+            <div id="time-remaining-display" class="text-xs sm:text-sm text-gray-400">Breath Window: --s</div>
+            <div id="streak-display" class="text-xl sm:text-2xl font-extrabold text-indigo-500">Streak: 0</div>
+            <div id="longest-streak-display" class="text-xs sm:text-sm text-gray-400">Longest: 0</div>
         </div>
 
-        <div class="flex flex-wrap justify-center gap-2 md:gap-4 w-full md:w-auto">
-            <button id="stats-btn" class="px-4 py-3 bg-purple-500 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-purple-600 transition duration-200 transform hover:scale-105">
+        <div class="flex flex-wrap justify-center gap-1.5 sm:gap-2 md:gap-3 w-full md:w-auto order-3">
+            <button id="stats-btn" class="px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 md:py-3 bg-purple-500 text-white text-sm sm:text-base md:text-lg font-bold rounded-lg md:rounded-xl shadow-lg hover:bg-purple-600 transition duration-200 transform hover:scale-105">
                 Stats
             </button>
-            <button id="settings-btn" class="px-4 py-3 bg-blue-500 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-blue-600 transition duration-200 transform hover:scale-105">
+            <button id="settings-btn" class="px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 md:py-3 bg-blue-500 text-white text-sm sm:text-base md:text-lg font-bold rounded-lg md:rounded-xl shadow-lg hover:bg-blue-600 transition duration-200 transform hover:scale-105">
                 Settings
             </button>
-            <button id="instructions-btn" class="px-4 py-3 bg-gray-500 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-gray-600 transition duration-200 transform hover:scale-105">
-                ? Instructions
+            <button id="instructions-btn" class="px-2 sm:px-3 md:px-4 py-1.5 sm:py-2 md:py-3 bg-gray-500 text-white text-sm sm:text-base md:text-lg font-bold rounded-lg md:rounded-xl shadow-lg hover:bg-gray-600 transition duration-200 transform hover:scale-105">
+                <span class="hidden sm:inline">?</span> Info
             </button>
 
             <!-- Pause Button -->
-            <button id="pause-btn" class="px-8 py-3 bg-yellow-600 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-yellow-700 transition duration-200 transform hover:scale-105 hidden">
+            <button id="pause-btn" class="px-4 sm:px-6 md:px-8 py-1.5 sm:py-2 md:py-3 bg-yellow-600 text-white text-sm sm:text-base md:text-lg font-bold rounded-lg md:rounded-xl shadow-lg hover:bg-yellow-700 transition duration-200 transform hover:scale-105 hidden">
                 Pause
             </button>
 
             <!-- Stop Button -->
-            <button id="stop-btn" class="px-8 py-3 bg-red-600 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-red-700 transition duration-200 transform hover:scale-105" disabled>
+            <button id="stop-btn" class="px-4 sm:px-6 md:px-8 py-1.5 sm:py-2 md:py-3 bg-red-600 text-white text-sm sm:text-base md:text-lg font-bold rounded-lg md:rounded-xl shadow-lg hover:bg-red-700 transition duration-200 transform hover:scale-105" disabled>
                 Stop
             </button>
 
             <!-- Start/Resume Button -->
-            <button id="start-btn" class="px-8 py-3 bg-green-600 text-white text-xl font-bold rounded-xl shadow-lg hover:bg-green-700 transition duration-200 transform hover:scale-105">
+            <button id="start-btn" class="px-4 sm:px-6 md:px-8 py-1.5 sm:py-2 md:py-3 bg-green-600 text-white text-sm sm:text-base md:text-lg font-bold rounded-lg md:rounded-xl shadow-lg hover:bg-green-700 transition duration-200 transform hover:scale-105">
                 Start
             </button>
         </div>
@@ -1135,87 +1106,87 @@
     <audio id="audio-player" class="hidden"></audio>
 
     <!-- Main Tap Area -->
-    <main id="game-area" class="flex-1 w-full max-w-4xl flex flex-col md:flex-row rounded-xl overflow-hidden shadow-2xl transition duration-500 min-h-0">
+    <main id="game-area" class="flex-1 w-full max-w-4xl flex flex-row rounded-xl overflow-hidden shadow-2xl transition duration-500 min-h-0">
 
         <!-- Left Tap Area Button -->
-        <button id="left-area-btn" class="side-tap-area flex-1 border-b md:border-r md:border-b-0 border-gray-700" data-side="left">
+        <button id="left-area-btn" class="side-tap-area flex-1 border-r border-gray-700" data-side="left">
             <div class="text-center">
-                <p class="text-3xl font-bold text-gray-100">Left Tap</p>
-                <p class="text-xl text-gray-300 mt-1">(Key: F)</p>
+                <p class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">Left</p>
+                <p class="text-sm sm:text-base md:text-xl text-gray-300 mt-0.5 sm:mt-1">(F)</p>
             </div>
         </button>
 
         <!-- Right Tap Area Button -->
         <button id="right-area-btn" class="side-tap-area flex-1" data-side="right">
             <div class="text-center">
-                <p class="text-3xl font-bold text-gray-100">Right Tap</p>
-                <p class="text-xl text-gray-300 mt-1">(Key: J)</p>
+                <p class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">Right</p>
+                <p class="text-sm sm:text-base md:text-xl text-gray-300 mt-0.5 sm:mt-1">(J)</p>
             </div>
         </button>
 
     </main>
 
     <!-- Settings Modal Screen -->
-    <div id="settings-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
-        <div class="bg-gray-800 text-gray-100 w-11/12 max-w-md p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto transition-colors duration-300">
-            <h2 class="text-2xl font-bold mb-6 border-b pb-2 border-gray-700">Game Settings</h2>
+    <div id="settings-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-2 sm:p-4 transition-opacity duration-300">
+        <div class="bg-gray-800 text-gray-100 w-full sm:w-11/12 max-w-md p-4 sm:p-6 md:p-8 rounded-xl shadow-2xl relative max-h-[95vh] sm:max-h-[90vh] overflow-y-auto transition-colors duration-300">
+            <h2 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6 border-b pb-2 border-gray-700">Game Settings</h2>
 
-            <div class="space-y-6">
+            <div class="space-y-3 sm:space-y-4 md:space-y-6">
 
                 <!-- Session Duration Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-700 p-4 rounded-lg">
-                    <label for="session-duration-input" class="font-medium text-lg">Session Duration:</label>
+                <div class="flex flex-col space-y-1.5 sm:space-y-2 bg-gray-700 p-3 sm:p-4 rounded-lg">
+                    <label for="session-duration-input" class="font-medium text-base sm:text-lg">Session Duration:</label>
                     <div class="flex items-center space-x-2">
-                         <input id="session-duration-input" type="number" value="10" min="1" max="180" class="w-full p-2 border border-gray-600 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-900 text-white">
-                         <span class="text-gray-300 font-medium">minutes</span>
+                         <input id="session-duration-input" type="number" value="10" min="1" max="180" class="w-full p-2 border border-gray-600 rounded-md text-center text-base sm:text-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-900 text-white">
+                         <span class="text-gray-300 font-medium text-sm sm:text-base">min</span>
                     </div>
-                    <p class="text-sm text-gray-400">The total time the meditation will run (1-180 min).</p>
+                    <p class="text-xs sm:text-sm text-gray-400">Total meditation time (1-180 min).</p>
                 </div>
 
                 <!-- Focus Window Duration Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-700 p-4 rounded-lg">
-                    <label for="duration-input" class="font-medium text-lg">Focus Window Duration:</label>
+                <div class="flex flex-col space-y-1.5 sm:space-y-2 bg-gray-700 p-3 sm:p-4 rounded-lg">
+                    <label for="duration-input" class="font-medium text-base sm:text-lg">Focus Window:</label>
                     <div class="flex items-center space-x-2">
-                         <input id="duration-input" type="number" value="30" min="5" max="180" class="w-full p-2 border border-gray-600 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-900 text-white">
-                         <span class="text-gray-300 font-medium">seconds</span>
+                         <input id="duration-input" type="number" value="30" min="5" max="180" class="w-full p-2 border border-gray-600 rounded-md text-center text-base sm:text-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-900 text-white">
+                         <span class="text-gray-300 font-medium text-sm sm:text-base">sec</span>
                     </div>
-                    <p class="text-sm text-gray-400">Time (in seconds) allowed between taps before focus reset.</p>
+                    <p class="text-xs sm:text-sm text-gray-400">Time allowed between taps (5-180 sec).</p>
                 </div>
 
                 <!-- DTN Setting (Now Cycle Length) -->
-                <div class="flex flex-col space-y-2 bg-gray-700 p-4 rounded-lg">
-                    <label for="dtn-input" class="font-medium text-lg">Double Tap Number (DTN):</label>
-                    <input id="dtn-input" type="number" value="5" min="2" class="w-full p-2 border border-gray-600 rounded-md text-center text-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-900 text-white">
-                    <p class="text-sm text-gray-400">The cycle length. The DTN-th breath will require a double tap on the required side, after which the alternating pattern flips.</p>
+                <div class="flex flex-col space-y-1.5 sm:space-y-2 bg-gray-700 p-3 sm:p-4 rounded-lg">
+                    <label for="dtn-input" class="font-medium text-base sm:text-lg">Double Tap Number (DTN):</label>
+                    <input id="dtn-input" type="number" value="5" min="2" class="w-full p-2 border border-gray-600 rounded-md text-center text-base sm:text-lg focus:ring-blue-500 focus:border-blue-500 bg-gray-900 text-white">
+                    <p class="text-xs sm:text-sm text-gray-400">Cycle length before double tap is required.</p>
                 </div>
 
                 <!-- Hide Status Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-700 p-4 rounded-lg">
-                    <label for="hide-status-input" class="font-medium text-lg flex items-center justify-between">
+                <div class="flex flex-col space-y-1.5 sm:space-y-2 bg-gray-700 p-3 sm:p-4 rounded-lg">
+                    <label for="hide-status-input" class="font-medium text-base sm:text-lg flex items-center justify-between">
                         Hide Status Display
-                        <input id="hide-status-input" type="checkbox" class="h-6 w-6 text-blue-600 border-gray-600 rounded focus:ring-blue-500">
+                        <input id="hide-status-input" type="checkbox" class="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 border-gray-600 rounded focus:ring-blue-500">
                     </label>
-                    <p class="text-sm text-gray-400">Hide the detailed "Status" line during meditation for a cleaner view.</p>
+                    <p class="text-xs sm:text-sm text-gray-400">Hide status line during meditation.</p>
                 </div>
 
                 <!-- Vibration Setting -->
-                <div class="flex flex-col space-y-2 bg-gray-700 p-4 rounded-lg">
-                    <label for="vibration-input" class="font-medium text-lg flex items-center justify-between">
-                        Enable Vibration Feedback
-                        <input id="vibration-input" type="checkbox" class="h-6 w-6 text-blue-600 border-gray-600 rounded focus:ring-blue-500">
+                <div class="flex flex-col space-y-1.5 sm:space-y-2 bg-gray-700 p-3 sm:p-4 rounded-lg">
+                    <label for="vibration-input" class="font-medium text-base sm:text-lg flex items-center justify-between">
+                        Vibration Feedback
+                        <input id="vibration-input" type="checkbox" class="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 border-gray-600 rounded focus:ring-blue-500">
                     </label>
-                    <p class="text-sm text-gray-400">Triggers device vibration for focus resets and mistakes (requires compatible device).</p>
+                    <p class="text-xs sm:text-sm text-gray-400">Haptic feedback for alerts.</p>
                 </div>
 
             </div>
 
-            <button id="save-settings-btn" class="mt-6 w-full px-4 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md">
-                Save All Settings
+            <button id="save-settings-btn" class="mt-4 sm:mt-6 w-full px-4 py-2.5 sm:py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md text-sm sm:text-base">
+                Save Settings
             </button>
 
 
-            <button id="close-settings-btn" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-200 transition duration-150 rounded-full bg-gray-700 hover:bg-gray-600">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <button id="close-settings-btn" class="absolute top-2 right-2 sm:top-4 sm:right-4 p-1.5 sm:p-2 text-gray-400 hover:text-gray-200 transition duration-150 rounded-full bg-gray-700 hover:bg-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
@@ -1223,49 +1194,40 @@
     </div>
 
     <!-- Instructions Modal Screen -->
-    <div id="instructions-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
-        <div class="bg-gray-800 text-gray-100 w-11/12 max-w-3xl p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto transition-colors duration-300">
-            <h2 class="text-3xl font-bold text-gray-100 mb-6 border-b pb-2 border-gray-700">Mindful Tap Instructions</h2>
+    <div id="instructions-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-2 sm:p-4 transition-opacity duration-300">
+        <div class="bg-gray-800 text-gray-100 w-full sm:w-11/12 max-w-3xl p-4 sm:p-6 md:p-8 rounded-xl shadow-2xl relative max-h-[95vh] sm:max-h-[90vh] overflow-y-auto transition-colors duration-300">
+            <h2 class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100 mb-4 sm:mb-6 border-b pb-2 border-gray-700">Instructions</h2>
 
-            <div class="text-base space-y-4">
-                <p>Before starting, take a comfortable position. You may close your eyes if you wish.</p>
+            <div class="text-sm sm:text-base space-y-3 sm:space-y-4">
+                <p>Take a comfortable position. You may close your eyes.</p>
 
-                <div class="bg-blue-900 p-4 rounded-lg border border-blue-700">
-                    <h3 class="font-semibold text-lg text-blue-400 mb-2">The Basic Rhythm:</h3>
-                    <p class="mb-2">Observe your complete breath cycle (in-breath and out-breath).</p>
-                    <ul class="list-disc list-inside space-y-1 ml-4">
-                        <li>After each completed breath, tap the screen or press a key.</li>
-                        <li>The required tap side alternates: <span class="font-bold text-gray-100">Right (J key)</span> then <span class="font-bold text-gray-100">Left (F key)</span>.</li>
-                        <li>The meditation starts with a tap on the <span class="font-bold text-blue-400">Right side</span>.</li>
+                <div class="bg-blue-900 p-3 sm:p-4 rounded-lg border border-blue-700">
+                    <h3 class="font-semibold text-base sm:text-lg text-blue-400 mb-1.5 sm:mb-2">Basic Rhythm:</h3>
+                    <p class="mb-2 text-sm sm:text-base">Observe your breath cycle (in and out).</p>
+                    <ul class="list-disc list-inside space-y-1 ml-2 sm:ml-4 text-sm sm:text-base">
+                        <li>After each breath, tap the screen or press a key.</li>
+                        <li>Sides alternate: <span class="font-bold text-gray-100">Right (J)</span> then <span class="font-bold text-gray-100">Left (F)</span>.</li>
+                        <li>Start with <span class="font-bold text-blue-400">Right side</span>.</li>
                     </ul>
                 </div>
 
-                <div class="bg-yellow-900 p-4 rounded-lg border border-yellow-700">
-                    <h3 class="font-semibold text-lg text-yellow-400 mb-2">Double Tap Cycle (DTN):</h3>
-                    <p>On every DTN-th breath (currently set to <span id="modal-dtn-display" class="font-bold text-red-400">5</span>), you must perform a <span class="font-bold text-red-400">DOUBLE TAP</span> on the required side.</p>
-                    <p class="text-sm italic mt-1">Example (DTN=5): B1 (Right, single), B2 (Left, single), B3 (Right, single), B4 (Left, single), B5 (<span class="font-bold text-red-400">Right, double tap sequence</span>). This means two separate taps on the Right side are required for this breath. The side does not flip until the double tap sequence is complete. Then, restart counting (B1) with the opposite side (Left).</p>
-                    <p class="text-sm mt-2 font-semibold text-gray-200">Note: Double tap requires two quick, separate taps/key presses on the same side.</p>
+                <div class="bg-yellow-900 p-3 sm:p-4 rounded-lg border border-yellow-700">
+                    <h3 class="font-semibold text-base sm:text-lg text-yellow-400 mb-1.5 sm:mb-2">Double Tap (DTN):</h3>
+                    <p class="text-sm sm:text-base">On every DTN-th breath (set to <span id="modal-dtn-display" class="font-bold text-red-400">5</span>), perform a <span class="font-bold text-red-400">DOUBLE TAP</span>.</p>
+                    <p class="text-xs sm:text-sm italic mt-1">Example: B1-B4 single taps, B5 double tap on same side, then cycle restarts on opposite side.</p>
                 </div>
 
-                <div class="bg-red-900 p-4 rounded-lg border border-red-700">
-                    <h3 class="font-semibold text-lg text-red-400 mb-2">Focus Reset:</h3>
-                    <p class="space-y-1">
-                        Any <span class="font-bold">mistake</span> (wrong side) or failing to tap within the <span class="font-bold">Breath Window</span> will:
-                        <ul class="list-disc list-inside ml-4">
-                            <li>Reset your streak counter to 0.</li>
-                            <li>Play a beep (Mistake Sound for incorrect tap, Focus Reminder for inactivity).</li>
-                            <li>Visually highlight the required side.</li>
-                        </ul>
-                    </p>
-                    <p class="text-sm mt-2">
-                        Noticing your focus has shifted and gently bringing it back to your breath is an essential part of the meditation. Tap the correct side (or press the correct key) to silence the beep and resume your practice.
+                <div class="bg-red-900 p-3 sm:p-4 rounded-lg border border-red-700">
+                    <h3 class="font-semibold text-base sm:text-lg text-red-400 mb-1.5 sm:mb-2">Focus Reset:</h3>
+                    <p class="text-sm sm:text-base">
+                        Mistakes or inactivity will reset your streak and play an alert. Tap the correct side to resume.
                     </p>
                 </div>
 
             </div>
 
-            <button id="close-instructions-btn" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-200 transition duration-150 rounded-full bg-gray-700 hover:bg-gray-600">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <button id="close-instructions-btn" class="absolute top-2 right-2 sm:top-4 sm:right-4 p-1.5 sm:p-2 text-gray-400 hover:text-gray-200 transition duration-150 rounded-full bg-gray-700 hover:bg-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
@@ -1273,51 +1235,51 @@
     </div>
 
     <!-- Stats Modal Screen (NEW) -->
-    <div id="stats-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-4 transition-opacity duration-300">
-        <div class="bg-gray-800 text-gray-100 w-11/12 max-w-4xl p-8 rounded-xl shadow-2xl relative max-h-[90vh] overflow-y-auto transition-colors duration-300">
-            <h2 class="text-2xl font-bold mb-6 border-b pb-2 border-gray-700 text-purple-400">Session History</h2>
+    <div id="stats-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center bg-gray-900 bg-opacity-80 p-2 sm:p-4 transition-opacity duration-300">
+        <div class="bg-gray-800 text-gray-100 w-full sm:w-11/12 max-w-4xl p-3 sm:p-5 md:p-8 rounded-xl shadow-2xl relative max-h-[95vh] sm:max-h-[90vh] overflow-y-auto transition-colors duration-300">
+            <h2 class="text-lg sm:text-xl md:text-2xl font-bold mb-3 sm:mb-6 border-b pb-2 border-gray-700 text-purple-400">Session History</h2>
 
-            <!-- Heatmap Visualization -->
-            <div class="mb-8 p-4 bg-gray-900 rounded-lg shadow-inner">
-                <h3 class="text-lg font-semibold mb-3 text-gray-300">Last Year's Consistency (Minutes Meditated)</h3>
-                <div class="flex space-x-2 mb-2 text-xs text-gray-400 overflow-x-auto pb-2"> <!-- Added overflow scroll for heatmap on very small screens -->
-                    <div class="grid grid-rows-7 gap-3 text-center flex-none">
-                        <div class="h-3 leading-3">S</div>
-                        <div class="h-3"></div>
-                        <div class="h-3 leading-3">T</div>
-                        <div class="h-3"></div>
-                        <div class="h-3 leading-3">T</div>
-                        <div class="h-3"></div>
-                        <div class="h-3 leading-3">S</div>
+            <!-- Heatmap Visualization - Hidden on very small screens -->
+            <div class="hidden sm:block mb-4 sm:mb-8 p-2 sm:p-4 bg-gray-900 rounded-lg shadow-inner">
+                <h3 class="text-sm sm:text-base md:text-lg font-semibold mb-2 sm:mb-3 text-gray-300">Yearly Activity</h3>
+                <div class="flex space-x-2 mb-2 text-xs text-gray-400 overflow-x-auto pb-2">
+                    <div class="grid grid-rows-7 gap-2 sm:gap-3 text-center flex-none">
+                        <div class="h-2 sm:h-3 leading-3 text-[10px] sm:text-xs">S</div>
+                        <div class="h-2 sm:h-3"></div>
+                        <div class="h-2 sm:h-3 leading-3 text-[10px] sm:text-xs">T</div>
+                        <div class="h-2 sm:h-3"></div>
+                        <div class="h-2 sm:h-3 leading-3 text-[10px] sm:text-xs">T</div>
+                        <div class="h-2 sm:h-3"></div>
+                        <div class="h-2 sm:h-3 leading-3 text-[10px] sm:text-xs">S</div>
                     </div>
-                    <div id="heatmap-container" class="flex flex-row flex-wrap flex-1 min-w-[600px]"> <!-- Set min width to ensure grid renders nicely, scrollable container -->
+                    <div id="heatmap-container" class="flex flex-row flex-wrap flex-1 min-w-[500px] sm:min-w-[600px]">
                         <!-- Heatmap cells inserted by JavaScript -->
                     </div>
                 </div>
-                <div class="flex justify-between items-center mt-4 text-xs text-gray-400">
-                    <span>Less Activity</span>
-                    <div class="flex items-center space-x-1">
-                        <div class="heat-cell !bg-gray-800"></div>
-                        <div class="heat-cell level-4"></div>
-                        <div class="heat-cell level-3"></div>
-                        <div class="heat-cell level-2"></div>
-                        <div class="heat-cell level-1"></div>
-                        <span>More Activity</span>
+                <div class="flex justify-between items-center mt-2 sm:mt-4 text-[10px] sm:text-xs text-gray-400">
+                    <span>Less</span>
+                    <div class="flex items-center space-x-0.5 sm:space-x-1">
+                        <div class="heat-cell !w-2 !h-2 sm:!w-3.5 sm:!h-3.5 !bg-gray-800"></div>
+                        <div class="heat-cell !w-2 !h-2 sm:!w-3.5 sm:!h-3.5 level-4"></div>
+                        <div class="heat-cell !w-2 !h-2 sm:!w-3.5 sm:!h-3.5 level-3"></div>
+                        <div class="heat-cell !w-2 !h-2 sm:!w-3.5 sm:!h-3.5 level-2"></div>
+                        <div class="heat-cell !w-2 !h-2 sm:!w-3.5 sm:!h-3.5 level-1"></div>
+                        <span>More</span>
                     </div>
                 </div>
             </div>
 
-            <h3 class="text-lg font-semibold mb-3 text-gray-300 border-b border-gray-700 pb-2">Session Log</h3>
+            <h3 class="text-sm sm:text-base md:text-lg font-semibold mb-2 sm:mb-3 text-gray-300 border-b border-gray-700 pb-2">Session Log</h3>
 
-            <div class="overflow-x-auto">
-                <table class="min-w-full table-auto text-sm text-left text-gray-400">
-                    <thead class="text-xs text-gray-100 uppercase bg-gray-700">
+            <div class="overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
+                <table class="min-w-full table-auto text-xs sm:text-sm text-left text-gray-400">
+                    <thead class="text-[10px] sm:text-xs text-gray-100 uppercase bg-gray-700">
                         <tr>
-                            <th scope="col" class="py-3 px-6 stats-header">Date</th>
-                            <th scope="col" class="py-3 px-6 stats-header">Duration</th>
-                            <th scope="col" class="py-3 px-6 stats-header">DTN</th>
-                            <th scope="col" class="py-3 px-6 stats-header">Hit Rate</th>
-                            <th scope="col" class="py-3 px-6 stats-header">Longest Streak</th>
+                            <th scope="col" class="py-2 px-2 sm:py-3 sm:px-4 md:px-6 stats-header">Date</th>
+                            <th scope="col" class="py-2 px-2 sm:py-3 sm:px-4 md:px-6 stats-header">Time</th>
+                            <th scope="col" class="py-2 px-2 sm:py-3 sm:px-4 md:px-6 stats-header hidden sm:table-cell">DTN</th>
+                            <th scope="col" class="py-2 px-2 sm:py-3 sm:px-4 md:px-6 stats-header">Rate</th>
+                            <th scope="col" class="py-2 px-2 sm:py-3 sm:px-4 md:px-6 stats-header">Streak</th>
                         </tr>
                     </thead>
                     <tbody id="stats-table-body">
@@ -1326,8 +1288,8 @@
                 </table>
             </div>
 
-            <button id="close-stats-btn" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-200 transition duration-150 rounded-full bg-gray-700 hover:bg-gray-600">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <button id="close-stats-btn" class="absolute top-2 right-2 sm:top-4 sm:right-4 p-1.5 sm:p-2 text-gray-400 hover:text-gray-200 transition duration-150 rounded-full bg-gray-700 hover:bg-gray-600">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                 </svg>
             </button>
