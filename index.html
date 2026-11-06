@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"> <!-- Prevent zooming on mobile -->
     <title>Mindful Tap Meditation Game</title>
-    <link rel="icon" type="image/x-icon" href="icon.svg">
+    <link rel="icon" type="image/svg+xml" href="icon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="manifest" href="/mindful_tap/manifest.webmanifest">
     <link rel="canonical" href="https://mufabo.github.io/mindful_tap/" />
@@ -134,6 +134,8 @@
             countdownInterval: null, // Interval for the breath window countdown
             sessionTimer: null, // Timeout for total session duration
             sessionTimeRemainingSeconds: 0,
+            sessionTotalSeconds: 0, // Length of the current session, fixed when it starts
+            sessionEndsAt: 0, // Wall-clock timestamp (ms) at which the running session ends
             sessionCountdownInterval: null, // Interval for the session countdown
         };
 
@@ -187,6 +189,29 @@
         let oscillator;
         let gainNode;
 
+        /**
+         * Returns the shared AudioContext, creating it if needed and resuming it
+         * if the browser's autoplay policy left it suspended.
+         * Call it once from a user gesture (see unlockAudio) so later sounds
+         * triggered from timers are allowed to play.
+         */
+        function getAudioContext() {
+            audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') {
+                audioContext.resume().catch(e => console.warn("Could not resume AudioContext:", e));
+            }
+            return audioContext;
+        }
+
+        // Must be called from inside a user gesture handler (click/keydown).
+        function unlockAudio() {
+            try {
+                getAudioContext();
+            } catch (e) {
+                console.warn("Audio API not supported:", e);
+            }
+        }
+
         // Vibration Function
         function triggerVibration(pattern) {
             if (state.isVibrationEnabled && 'vibrate' in navigator) {
@@ -202,7 +227,7 @@
             triggerVibration([500, 500, 500]);
 
             try {
-                audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+                getAudioContext();
                 oscillator = audioContext.createOscillator();
                 gainNode = audioContext.createGain();
 
@@ -263,7 +288,7 @@
             triggerVibration(200);
 
             try {
-                audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+                getAudioContext();
                 const tone = audioContext.createOscillator();
                 const gain = audioContext.createGain();
 
@@ -287,7 +312,7 @@
          */
         function playSingleGong() {
             try {
-                audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+                getAudioContext();
 
                 const oscillator = audioContext.createOscillator();
                 const gainNode = audioContext.createGain();
@@ -458,7 +483,8 @@
 
             // Store duration before clearing timers
             const sessionEndTimestamp = Date.now();
-            const sessionTotalTimeSeconds = state.sessionDurationMinutes * 60 - state.sessionTimeRemainingSeconds;
+            // Use the length fixed at session start, so changing the setting mid-session can't skew it
+            const sessionTotalTimeSeconds = Math.max(0, state.sessionTotalSeconds - state.sessionTimeRemainingSeconds);
 
             // Clear all timers
             clearTimeout(state.tapTimer);
@@ -472,6 +498,7 @@
             state.sessionCountdownInterval = null;
 
             const finalStreak = state.currentStreak;
+            const sessionBestStreak = Math.max(state.currentSession.longestStreak, finalStreak);
 
             // Log session history
             const hitRate = (state.currentSession.totalTaps > 0)
@@ -480,6 +507,7 @@
 
             const sessionData = {
                 date: new Date(sessionEndTimestamp).toLocaleString(),
+                timestamp: sessionEndTimestamp, // Locale-independent; used for the heatmap
                 duration: formatSessionDuration(sessionTotalTimeSeconds),
                 durationSeconds: sessionTotalTimeSeconds,
                 dtn: state.dtn,
@@ -487,6 +515,7 @@
                 mistakes: state.currentSession.mistakes,
                 inactivityResets: state.currentSession.inactivityResets,
                 finalStreak: finalStreak,
+                longestStreak: sessionBestStreak,
                 hitRate: (hitRate * 100).toFixed(1) + '%',
             };
 
@@ -544,6 +573,7 @@
         // NEW: Resume Meditation Function
         function resumeMeditation() {
             if (state.gameState !== 'paused') return;
+            stopBeeping(); // Resuming from an inactivity pause must silence the alarm
 
             state.gameState = 'running';
 
@@ -647,6 +677,10 @@
             // Determine the starting time for the timer
             const secondsToRun = initialSeconds !== null ? initialSeconds : state.sessionDurationMinutes * 60;
             const durationMs = secondsToRun * 1000;
+            if (initialSeconds === null) {
+                state.sessionTotalSeconds = secondsToRun; // Fresh session
+            }
+            state.sessionEndsAt = Date.now() + durationMs;
 
             // Set up the main timer that stops the session
             state.sessionTimer = setTimeout(() => {
@@ -656,7 +690,8 @@
             // Set up the display countdown
             state.sessionTimeRemainingSeconds = secondsToRun;
             state.sessionCountdownInterval = setInterval(() => {
-                state.sessionTimeRemainingSeconds = Math.max(0, state.sessionTimeRemainingSeconds - 1);
+                // Derive from the wall clock so background-tab timer throttling doesn't skew it
+                state.sessionTimeRemainingSeconds = Math.max(0, Math.ceil((state.sessionEndsAt - Date.now()) / 1000));
                 updateUI();
                 if (state.sessionTimeRemainingSeconds <= 0) {
                     clearInterval(state.sessionCountdownInterval);
@@ -685,7 +720,7 @@
                 state.breathCount++;
                 state.expectedSide = (state.expectedSide === 'right' ? 'left' : 'right');
 
-                if (state.breathCount === state.dtn) {
+                if (state.breathCount >= state.dtn) {
                     state.expectedTapType = 'double';
                 } else {
                     state.expectedTapType = 'single';
@@ -697,16 +732,24 @@
         }
 
         // NEW: Function to aggregate historical data into daily minutes
+        // YYYY-MM-DD in the user's local timezone
+        function localDateKey(date) {
+            const y = date.getFullYear();
+            const m = String(date.getMonth() + 1).padStart(2, '0');
+            const d = String(date.getDate()).padStart(2, '0');
+            return `${y}-${m}-${d}`;
+        }
+
         function getDailyActivity() {
             const history = getSessionHistory();
             const dailyActivity = {}; // Key: YYYY-MM-DD, Value: total duration in minutes
 
             history.forEach(session => {
-                // Date format is already localized string, needs parsing
-                // Assuming session.date is a string like "12/8/2025, 6:47:21 PM"
-                const date = new Date(session.date);
-                // Format date as YYYY-MM-DD
-                const dateKey = date.toISOString().split('T')[0];
+                // Newer records carry a numeric timestamp. Older ones only have a
+                // locale-formatted string, which may not be parseable; skip those.
+                const date = new Date(session.timestamp !== undefined ? session.timestamp : session.date);
+                if (isNaN(date.getTime())) return;
+                const dateKey = localDateKey(date);
                 const durationMinutes = Math.ceil(session.durationSeconds / 60);
 
                 if (dailyActivity[dateKey]) {
@@ -741,7 +784,7 @@
 
             // Generate cells for the entire year
             for (let i = 0; i < dayCount; i++) {
-                const dateKey = currentDate.toISOString().split('T')[0];
+                const dateKey = localDateKey(currentDate);
                 const minutes = dailyActivity[dateKey] || 0;
 
                 const cell = document.createElement('div');
@@ -837,7 +880,7 @@
                 // Longest Streak
                 const streakCell = row.insertCell();
                 streakCell.className = 'py-2 px-2 sm:py-3 sm:px-4 md:px-6';
-                streakCell.textContent = session.finalStreak;
+                streakCell.textContent = session.longestStreak !== undefined ? session.longestStreak : session.finalStreak;
             });
         }
     </script>
@@ -972,6 +1015,7 @@
 
             // Add event listeners for control buttons
             document.getElementById('start-btn').addEventListener('click', () => {
+                unlockAudio(); // Allow later timer-triggered beeps/gongs under autoplay policies
                 if (state.gameState === 'idle' || state.gameState === 'complete') {
                     // Start a fresh meditation session
                     startSessionTimer(); // Start the overall session timer (start fresh)
@@ -1002,17 +1046,17 @@
                 let isValid = true;
                 let feedback = '';
 
-                if (newDTN < 2) {
+                if (!Number.isInteger(newDTN) || newDTN < 2) {
                     feedback += "DTN must be 2 or greater. ";
                     dtnInput.value = state.dtn;
                     isValid = false;
                 }
-                if (newDurationSec < 5 || newDurationSec > 180) {
+                if (!Number.isInteger(newDurationSec) || newDurationSec < 5 || newDurationSec > 180) {
                      feedback += "Breath Window Duration must be between 5 and 180 seconds. ";
                      durationInput.value = state.inactivityDurationMs / 1000;
                      isValid = false;
                 }
-                if (newSessionDurationMin < 1 || newSessionDurationMin > 180) {
+                if (!Number.isInteger(newSessionDurationMin) || newSessionDurationMin < 1 || newSessionDurationMin > 180) {
                      feedback += "Session Duration must be between 1 and 180 minutes. ";
                      sessionDurationInput.value = state.sessionDurationMinutes;
                      isValid = false;
@@ -1036,7 +1080,8 @@
                     }, 1000);
 
                     // If game is running, restart breath timer with new duration, but session timer continues unless reset.
-                    if (state.gameState === 'running' || state.gameState === 'paused') {
+                    // Not while paused: resumeMeditation() (or the resume tap) restarts it with the new duration.
+                    if (state.gameState === 'running') {
                         startTapTimer();
                     }
                     updateUI();
