@@ -29,6 +29,7 @@ Every DTN-th breath requires a **double tap** on the same side. For example, wit
 - **Configurable settings**: Session duration, focus window, DTN
 - **Audio feedback**: Beeping for inactivity, tones for mistakes, gong on completion
 - **Vibration support**: Haptic feedback on compatible devices
+- **Dark screen**: Tap the moon button in the middle of the tap area (or press B) to turn the screen nearly completely black while meditating; labels and the side hint are hidden. Enable "Dark Screen by Default" in Settings to start every session dark
 - **Statistics**: Session history with hit rate, streaks, and activity heatmap
 - **Offline support**: Works without internet once loaded (PWA)
 - **Installable**: Add to home screen on mobile devices
@@ -42,6 +43,7 @@ Every DTN-th breath requires a **double tap** on the same side. For example, wit
 | DTN | 2+ | Breath count before double tap |
 | Hide Status | On/Off | Cleaner view during meditation |
 | Vibration | On/Off | Haptic feedback toggle |
+| Dark Screen by Default | On/Off | Start every session with a black screen |
 
 ## Tech Stack
 

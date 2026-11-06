@@ -61,6 +61,38 @@
             100% { background-color: #dc2626; } /* Red-600 */
         }
 
+        /* Dark-screen toggle: small round button in the middle of the tap area */
+        #blackout-btn {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 20; /* Above the .expected glow (z-index 10) */
+            width: 2.5rem;
+            height: 2.5rem;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: rgba(17, 24, 39, 0.85); /* gray-900 */
+            border: 1px solid #4b5563; /* gray-600 */
+            color: #9ca3af; /* gray-400 */
+            transition: background-color 0.3s, color 0.3s, border-color 0.3s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        #blackout-btn[aria-pressed="true"] { color: #818cf8; border-color: #6366f1; } /* Indigo: mode is on */
+
+        /* Dark screen: applied to <body> while a session runs and the mode is on */
+        body.blackout { background-color: #000 !important; padding: 0 !important; }
+        body.blackout > header,
+        body.blackout #control-panel { display: none !important; }
+        body.blackout #game-area { max-width: none; border-radius: 0; box-shadow: none; background-color: #000; }
+        body.blackout .side-tap-area { background-color: #000 !important; box-shadow: none !important; }
+        body.blackout .side-tap-area > * { visibility: hidden; } /* Hide Left/Right labels */
+        body.blackout #left-area-btn { border-color: #0a0a0a; } /* Barely visible divider */
+        body.blackout .side-tap-area:active { background-color: #080808 !important; filter: none; transform: none; } /* Faint tap feedback */
+        body.blackout #blackout-btn { background-color: #000; border-color: #141414; color: #1f1f1f; }
+
         .stats-header {
             cursor: pointer;
             user-select: none;
@@ -102,6 +134,7 @@
         const SESSION_DURATION_DEFAULT_MINUTES = 10;
         const LOCAL_STORAGE_KEY = 'mindfulTapSettings'; // Key for localStorage
         const HISTORY_STORAGE_KEY = 'mindfulTapHistory'; // NEW: Key for history
+        const BLACKOUT_STORAGE_KEY = 'mindfulTapBlackout'; // "Dark screen by default" setting ('1' or '0')
 
         const state = {
             dtn: DTN_DEFAULT,
@@ -109,6 +142,8 @@
             sessionDurationMinutes: SESSION_DURATION_DEFAULT_MINUTES,
             hideStatus: false,
             isVibrationEnabled: false,
+            blackoutDefault: false, // Setting: sessions start in dark-screen mode (stored under BLACKOUT_STORAGE_KEY)
+            blackout: false, // Dark-screen mode for the current/next session; the moon button flips it, reset to the default after each session
             gameState: 'idle', // 'idle', 'running', 'paused', 'complete'
             breathCount: 0, // 1 to DTN
             currentStreak: 0,
@@ -141,6 +176,12 @@
 
         // --- Local Storage Persistence ---
         function loadSettings() {
+            try {
+                state.blackoutDefault = localStorage.getItem(BLACKOUT_STORAGE_KEY) === '1';
+            } catch (e) {
+                console.warn("Could not read dark-screen setting:", e);
+            }
+            state.blackout = state.blackoutDefault;
             const storedSettings = localStorage.getItem(LOCAL_STORAGE_KEY);
             if (storedSettings) {
                 try {
@@ -455,6 +496,11 @@
             const gameArea = document.getElementById('game-area');
             gameArea.classList.toggle('beeping-bg', state.isBeeping);
 
+            // 3b. Dark screen: only while a session runs (or is beeping after inactivity),
+            // so the controls are back whenever the user pauses or the session ends.
+            document.body.classList.toggle('blackout', state.blackout && (isRunning || state.isBeeping));
+            document.getElementById('blackout-btn').setAttribute('aria-pressed', String(state.blackout));
+
             // 4. Streaks
             streakDisplay.textContent = `Streak: ${state.currentStreak}`;
             longestStreakDisplay.textContent = `Longest: ${state.longestStreak}`;
@@ -540,6 +586,7 @@
             state.expectedTapType = 'single'; // Reset tap type
             state.cycleStartSide = 'right';
             state.isAwaitingSecondTap = false; // Reset DTN sequence flag
+            state.blackout = state.blackoutDefault; // Moon-button choice only lasts for one session
 
             // Reset current session tracking
             state.currentSession = { startTime: 0, totalTaps: 0, mistakes: 0, inactivityResets: 0, longestStreak: 0 };
@@ -942,10 +989,22 @@
             handleTap(actualSide);
         }
 
+        // Toggles dark-screen mode for the current (or next) session only.
+        // The "Dark Screen by Default" setting decides the starting state of each session.
+        function toggleBlackout() {
+            state.blackout = !state.blackout;
+            updateUI();
+        }
+
         // 2. Keyboard Logic (Simplest form: one keydown = one tap)
         function handleKeyDown(event) {
             const key = event.key.toLowerCase();
             let actualSide = null;
+
+            if (key === 'b' && !event.repeat && event.target.tagName !== 'INPUT') {
+                toggleBlackout();
+                return;
+            }
 
             if (key === 'f') { actualSide = 'left'; }
             else if (key === 'j') { actualSide = 'right'; }
@@ -973,6 +1032,7 @@
             document.getElementById('session-duration-input').value = state.sessionDurationMinutes;
             document.getElementById('hide-status-input').checked = state.hideStatus;
             document.getElementById('vibration-input').checked = state.isVibrationEnabled;
+            document.getElementById('blackout-default-input').checked = state.blackoutDefault;
 
             document.getElementById('settings-modal').classList.remove('hidden');
         }
@@ -1001,6 +1061,7 @@
             // Add event listeners for tap areas (now buttons)
             document.getElementById('left-area-btn').addEventListener('click', handleScreenTap);
             document.getElementById('right-area-btn').addEventListener('click', handleScreenTap);
+            document.getElementById('blackout-btn').addEventListener('click', toggleBlackout);
 
             // Add event listeners for keyboard input
             document.addEventListener('keydown', handleKeyDown);
@@ -1071,6 +1132,17 @@
 
                     saveSettings(state.dtn, state.inactivityDurationMs, state.sessionDurationMinutes, state.longestStreak, state.hideStatus, state.isVibrationEnabled);
 
+                    state.blackoutDefault = document.getElementById('blackout-default-input').checked;
+                    try {
+                        localStorage.setItem(BLACKOUT_STORAGE_KEY, state.blackoutDefault ? '1' : '0');
+                    } catch (e) {
+                        console.warn("Could not save dark-screen setting:", e);
+                    }
+                    // Outside a session, apply right away; during one, keep the current mode
+                    if (state.gameState === 'idle' || state.gameState === 'complete') {
+                        state.blackout = state.blackoutDefault;
+                    }
+
                     // Show confirmation message
                     const originalText = document.getElementById('save-settings-btn').textContent;
                     document.getElementById('save-settings-btn').textContent = 'Saved!';
@@ -1108,7 +1180,7 @@
     </header>
 
     <!-- Game Status and Controls -->
-    <div class="w-full max-w-4xl bg-gray-800 p-3 sm:p-4 md:p-6 rounded-lg shadow-xl mb-2 sm:mb-4 flex-none flex flex-col md:flex-row justify-between items-center space-y-2 sm:space-y-3 md:space-y-0 transition-colors duration-300">
+    <div id="control-panel" class="w-full max-w-4xl bg-gray-800 p-3 sm:p-4 md:p-6 rounded-lg shadow-xl mb-2 sm:mb-4 flex-none flex flex-col md:flex-row justify-between items-center space-y-2 sm:space-y-3 md:space-y-0 transition-colors duration-300">
         <div id="status-display" class="text-sm sm:text-base md:text-lg font-semibold text-gray-300 order-2 md:order-1">Status: Idle</div>
 
         <!-- Central display for Streak and Timer -->
@@ -1151,7 +1223,7 @@
     <audio id="audio-player" class="hidden"></audio>
 
     <!-- Main Tap Area -->
-    <main id="game-area" class="flex-1 w-full max-w-4xl flex flex-row rounded-xl overflow-hidden shadow-2xl transition duration-500 min-h-0">
+    <main id="game-area" class="relative flex-1 w-full max-w-4xl flex flex-row rounded-xl overflow-hidden shadow-2xl transition duration-500 min-h-0">
 
         <!-- Left Tap Area Button -->
         <button id="left-area-btn" class="side-tap-area flex-1 border-r border-gray-700" data-side="left">
@@ -1167,6 +1239,13 @@
                 <p class="text-xl sm:text-2xl md:text-3xl font-bold text-gray-100">Right</p>
                 <p class="text-sm sm:text-base md:text-xl text-gray-300 mt-0.5 sm:mt-1">(J)</p>
             </div>
+        </button>
+
+        <!-- Dark-screen toggle (also: B key). Sits between the tap areas, not inside them, so it never counts as a tap. -->
+        <button id="blackout-btn" type="button" aria-pressed="false" aria-label="Toggle dark screen during meditation" title="Dark screen during meditation (B)">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+            </svg>
         </button>
 
     </main>
@@ -1223,6 +1302,15 @@
                     <p class="text-xs sm:text-sm text-gray-400">Haptic feedback for alerts.</p>
                 </div>
 
+                <!-- Dark Screen Default Setting -->
+                <div class="flex flex-col space-y-1.5 sm:space-y-2 bg-gray-700 p-3 sm:p-4 rounded-lg">
+                    <label for="blackout-default-input" class="font-medium text-base sm:text-lg flex items-center justify-between">
+                        Dark Screen by Default
+                        <input id="blackout-default-input" type="checkbox" class="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 border-gray-600 rounded focus:ring-blue-500">
+                    </label>
+                    <p class="text-xs sm:text-sm text-gray-400">Start every session with a black screen. The moon button (or B) still switches it for the current session.</p>
+                </div>
+
             </div>
 
             <button id="save-settings-btn" class="mt-4 sm:mt-6 w-full px-4 py-2.5 sm:py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition duration-150 shadow-md text-sm sm:text-base">
@@ -1253,6 +1341,7 @@
                         <li>After each breath, tap the screen or press a key.</li>
                         <li>Sides alternate: <span class="font-bold text-gray-100">Right (J)</span> then <span class="font-bold text-gray-100">Left (F)</span>.</li>
                         <li>Start with <span class="font-bold text-blue-400">Right side</span>.</li>
+                        <li>Tap the <span class="font-bold text-indigo-400">moon button</span> in the middle (or press <span class="font-bold text-gray-100">B</span>) for a dark screen during meditation. Tap it again to bring the controls back. Make it the default in Settings.</li>
                     </ul>
                 </div>
 

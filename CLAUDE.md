@@ -36,6 +36,7 @@ The `<body>` markup comes after these scripts. Elements are reached by `id`, so 
 ### Persistence
 
 - `mindfulTapSettings`: settings plus `longestStreak`. `saveSettings` takes six **positional** arguments and also writes `state.longestStreak`. Every call site passes the full set, so adding a setting means updating every caller and `loadSettings`.
+- `mindfulTapBlackout`: the "Dark Screen by Default" setting (`'1'`/`'0'`), kept outside `saveSettings`, loaded into `state.blackoutDefault`. `state.blackout` is the mode for the current or next session: the moon button and the B key flip it, and `stopMeditation` resets it to the default. `updateUI` adds the `blackout` class to `<body>` only while a session is running or beeping, and CSS does the rest.
 - `mindfulTapHistory`: an array of session records. `date` is a display-only `toLocaleString()` string. The heatmap uses the numeric `timestamp` and groups by local day (`localDateKey`). Older records have no `timestamp`, and the heatmap skips them when their `date` string won't parse. `longestStreak` is the session's best streak, and old records fall back to `finalStreak`. `hitRate` is stored as a preformatted string like `"93.3%"`. New code must handle both old and new record shapes. Sessions of 5 seconds or less are not saved.
 
 ## Service worker and deployment
