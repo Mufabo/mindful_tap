@@ -380,19 +380,17 @@
         }
 
         /**
-         * Plays the gong sound three times with a delay and vibrates three times.
+         * Plays the gong sound three times with a delay and vibrates four times.
          */
         function playGongSequence() {
             const numGongs = 3;
             const delayMs = 2500; // Delay between gongs (2.5 seconds)
-            const vibrationDuration = 500; // Duration of each vibration pulse
+
+            // Four 500ms vibration pulses separated by 300ms pauses
+            triggerVibration([500, 300, 500, 300, 500, 300, 500]);
 
             for (let i = 0; i < numGongs; i++) {
-                setTimeout(() => {
-                    playSingleGong();
-                    // Vibrate concurrently with the gong
-                    triggerVibration(vibrationDuration);
-                }, i * delayMs);
+                setTimeout(playSingleGong, i * delayMs);
             }
         }
     </script>
@@ -571,7 +569,7 @@
 
             // Play gong sequence if session completed automatically
             if (trigger === 'complete') {
-                playGongSequence(); // Calls the function that plays 3 gongs and vibrates 3 times
+                playGongSequence(); // Plays 3 gongs and vibrates 4 times
             }
 
             // Save streak if it's a record
